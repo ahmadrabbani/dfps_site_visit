@@ -77,13 +77,13 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.upgradetemp"
+    namespace "com.ahmadrabbani1.dfpssitevisit"
     defaultConfig {
-        applicationId "com.upgradetemp"
+        applicationId "com.ahmadrabbani1.dfpssitevisit"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
     }
     signingConfigs {
         debug {

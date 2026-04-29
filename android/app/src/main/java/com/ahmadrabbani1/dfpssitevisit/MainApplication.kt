@@ -1,4 +1,4 @@
-package com.upgradetemp
+package com.ahmadrabbani1.dfpssitevisit
 
 import android.app.Application
 import com.facebook.react.PackageList
