@@ -2,6 +2,7 @@
  * @format
  */
 
+import 'react-native-reanimated';
 import 'react-native-gesture-handler';
 import './global.css';
 import { AppRegistry } from 'react-native';

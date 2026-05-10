@@ -1,6 +1,72 @@
 /**
  * Runs before test files load. Mocks native modules pulled in by static imports in App/screens.
  */
+jest.mock('@react-navigation/drawer', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+
+  function createDrawerNavigator() {
+    const Navigator = ({children}) => (
+      <View>
+        {React.Children.toArray(children).map(child => {
+          if (!React.isValidElement(child)) {
+            return null;
+          }
+          const Comp = child.props.component;
+          return Comp ? <Comp key={child.key || child.props.name} /> : null;
+        })}
+      </View>
+    );
+    const Screen = () => null;
+    return {Navigator, Screen};
+  }
+
+  const DrawerContentScrollView = ({children, ...rest}) => (
+    <View {...rest}>{children}</View>
+  );
+  const DrawerItem = () => null;
+
+  return {createDrawerNavigator, DrawerContentScrollView, DrawerItem};
+});
+
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
+
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
+jest.mock('react-native-maps', () => {
+  const RN = require('react-native');
+  return {
+    __esModule: true,
+    default: RN.View,
+    Marker: RN.View,
+    PROVIDER_GOOGLE: 'google',
+  };
+});
+
+jest.mock('react-native-fast-image', () => require('react-native').Image);
+
+jest.mock('react-native-config', () => ({
+  default: {
+    API_BASE_URL: '',
+    USE_FAKE_API: 'false',
+    SENTRY_DSN: '',
+  },
+}));
+
+jest.mock('react-native-keychain', () => ({
+  setGenericPassword: jest.fn(() => Promise.resolve(true)),
+  getGenericPassword: jest.fn(() => Promise.resolve(false)),
+  resetGenericPassword: jest.fn(() => Promise.resolve(true)),
+}));
+
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );

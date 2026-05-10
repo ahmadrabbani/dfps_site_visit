@@ -1,115 +1,116 @@
-import React, {useEffect, useState} from 'react';
-import {View, StatusBar, LogBox} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {View, StatusBar, LogBox, ActivityIndicator, Text, StyleSheet} from 'react-native';
+import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
-import DashboardScreen from './screens/DashboardScreen';
-import SiteVisitScreen from './screens/SiteVisitScreen';
-import ViolationFormScreen from './screens/ViolationFormScreen';
-import SummaryScreen from './screens/SummaryScreen';
-import {addPendingVisit} from './services/storage';
+import AuthenticatedFlow from './navigation/AuthenticatedFlow';
 import {startSyncWatcher, stopSyncWatcher} from './services/syncService';
+import {clearSession, loadSession, saveSession} from './services/authService';
 
 LogBox.ignoreLogs([/SafeAreaView has been deprecated/]);
 
+const Stack = createNativeStackNavigator();
+
+function SplashScreen() {
+  return (
+    <View style={splashStyles.container}>
+      <StatusBar barStyle="dark-content" />
+      <ActivityIndicator size="large" color="#003366" accessibilityLabel="Loading session" />
+      <Text style={splashStyles.text}>Loading…</Text>
+    </View>
+  );
+}
+
 export default function App() {
+  const [authReady, setAuthReady] = useState(false);
   const [user, setUser] = useState(null);
-  const [screen, setScreen] = useState('login');
-  const [tmpViolations, setTmpViolations] = useState(null);
-  const [completedVisit, setCompletedVisit] = useState(null);
   const [siteScope, setSiteScope] = useState('residential');
+  const violationDraftRef = useRef(null);
 
   useEffect(() => {
     startSyncWatcher();
     return () => stopSyncWatcher();
   }, []);
 
-  const handleLogin = u => {
-    setUser(u);
-    setScreen('dashboard');
-  };
-
-  const handleStartVisit = () => {
-    setSiteScope('residential');
-    setScreen('siteVisit');
-  };
-
-  const handleAddViolation = (currentViolations, setViolations) => {
-    setTmpViolations({currentViolations, setViolations});
-    setScreen('violationForm');
-  };
-
-  const handleSaveViolation = violation => {
-    if (!tmpViolations) {
-      return;
-    }
-    const {currentViolations, setViolations} = tmpViolations;
-    const updated = [...currentViolations, violation];
-    setViolations(updated);
-    setTmpViolations(null);
-    setScreen('siteVisit');
-  };
-
-  const handleCompleteVisit = async (violations, scopeAtVisit) => {
-    const now = new Date().toISOString();
-    const visitScope = scopeAtVisit || siteScope;
-    const visit = {
-      localId: 'local-' + Date.now(),
-      siteId: 1, // will map to scheme/block/plot/case in backend
-      officerId: user.id,
-      authToken: user.token,
-      startTime: now,
-      endTime: now,
-      startLat: 31.5204,
-      startLon: 74.3587,
-      scope: visitScope,
-      violations,
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = await loadSession();
+        if (cancelled) {
+          return;
+        }
+        if (session) {
+          setUser(session);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setAuthReady(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    await addPendingVisit(visit);
-    setCompletedVisit(visit);
-    setScreen('summary');
-  };
+  }, []);
 
-  const handleSummaryDone = () => {
-    setScreen('dashboard');
-  };
+  const handleLogin = useCallback(async u => {
+    try {
+      await saveSession(u);
+    } catch (e) {
+      console.warn('[App] saveSession failed', e?.message);
+    }
+    setUser(u);
+  }, []);
 
-  if (screen === 'login') {
-    return (
-      <View style={{flex: 1}}>
-        <LoginScreen onLogin={handleLogin} />
-      </View>
-    );
-  }
+  const handleSignOut = useCallback(async () => {
+    await clearSession();
+    setUser(null);
+    violationDraftRef.current = null;
+  }, []);
+
+  const stackKey = !authReady ? 'splash' : user ? 'app' : 'auth';
 
   return (
-    <SafeAreaView style={{flex: 1}}>
-      <StatusBar barStyle="dark-content" />
-      {screen === 'dashboard' && (
-        <DashboardScreen user={user} onStartVisit={handleStartVisit} />
-      )}
-      {screen === 'siteVisit' && (
-        <SiteVisitScreen
-          user={user}
-          siteScope={siteScope}
-          onScopeChange={setSiteScope}
-          onAddViolation={handleAddViolation}
-          onCompleteVisit={handleCompleteVisit}
-        />
-      )}
-      {screen === 'violationForm' && (
-        <ViolationFormScreen
-          scope={siteScope}
-          onScopeChange={setSiteScope}
-          onSave={handleSaveViolation}
-          onCancel={() => {
-            setTmpViolations(null);
-            setScreen('siteVisit');
-          }}
-        />
-      )}
-      {screen === 'summary' && (
-        <SummaryScreen visit={completedVisit} onDone={handleSummaryDone} />
-      )}
-    </SafeAreaView>
+    <Stack.Navigator key={stackKey} screenOptions={{headerShown: false, animation: 'slide_from_right'}}>
+        {!authReady ? (
+          <Stack.Screen name="Splash" component={SplashScreen} />
+        ) : !user ? (
+          <Stack.Screen name="Login" options={{contentStyle: {flex: 1}}}>
+            {() => <LoginScreen onLogin={handleLogin} />}
+          </Stack.Screen>
+        ) : (
+          <Stack.Screen name="Authenticated" options={{headerShown: false}}>
+            {() => (
+              <AuthenticatedFlow
+                user={user}
+                siteScope={siteScope}
+                setSiteScope={setSiteScope}
+                violationDraftRef={violationDraftRef}
+                onSignOut={handleSignOut}
+              />
+            )}
+          </Stack.Screen>
+        )}
+      </Stack.Navigator>
   );
 }
+
+const splashStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  text: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#374151',
+  },
+});

@@ -136,8 +136,11 @@ Emit a toast/alert after sync so the inspector knows their data was received.
 
 Replace the manual string-based screen switcher with React Navigation. This adds back-gesture support, deep linking, and prevents the "blank screen on typo" bug.
 
+The app uses **`@react-navigation/native-stack`** (native transitions, hardware back on Android). Root wraps `src/App` in **`NavigationContainer`** in `App.tsx`.
+
 ```
-npm install @react-navigation/native @react-navigation/stack
+npm install @react-navigation/native @react-navigation/native-stack react-native-screens react-native-safe-area-context
+# iOS only:
 npx pod-install
 ```
 

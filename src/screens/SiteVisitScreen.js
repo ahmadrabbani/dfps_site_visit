@@ -1,7 +1,11 @@
 import React, {useEffect, useState} from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, FlatList} from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
+import {USE_FAKE_API} from '../config/env';
 import {colors} from '../theme/colors';
+
+/** Dev + fake API only: extra control without changing Geolocation logic below. */
+const showTestGpsControls = typeof __DEV__ !== 'undefined' && __DEV__ && USE_FAKE_API;
 
 export default function SiteVisitScreen({
   user,
@@ -10,7 +14,8 @@ export default function SiteVisitScreen({
   onAddViolation,
   onCompleteVisit,
 }) {
-  const [gpsAllowed, setGpsAllowed] = useState(false);
+  const [deviceOnSite, setDeviceOnSite] = useState(false);
+  const [fakeOnSite, setFakeOnSite] = useState(false);
   const [violations, setViolations] = useState([]);
 
   // demo target location
@@ -22,12 +27,14 @@ export default function SiteVisitScreen({
       pos => {
         const {latitude, longitude} = pos.coords;
         const dist = distanceInMeters(latitude, longitude, targetLat, targetLon);
-        setGpsAllowed(dist < 100);
+        setDeviceOnSite(dist < 100);
       },
       err => console.warn('GPS error', err),
       {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
     );
   }, []);
+
+  const effectiveOnSite = deviceOnSite || fakeOnSite;
 
   const handleAddViolation = () => {
     onAddViolation(violations, setViolations);
@@ -47,11 +54,29 @@ export default function SiteVisitScreen({
       <Text style={styles.header}>Site Visit</Text>
       <Text style={styles.siteInfo}>Scheme / Block / Plot will be loaded per site</Text>
       <Text style={styles.siteInfo}>Officer: {user.name}</Text>
-      <View style={[styles.statusBadge, {backgroundColor: gpsAllowed ? colors.success : colors.danger}]}>
+      <View style={[styles.statusBadge, {backgroundColor: effectiveOnSite ? colors.success : colors.danger}]}>
         <Text style={styles.statusText}>
-          {gpsAllowed ? 'On-site (GPS verified)' : 'Not at site location'}
+          {deviceOnSite
+            ? 'On-site (GPS verified)'
+            : fakeOnSite
+              ? 'On-site (test simulation)'
+              : 'Not at site location'}
         </Text>
       </View>
+
+      {showTestGpsControls ? (
+        <TouchableOpacity
+          style={styles.testGpsBtn}
+          onPress={() => setFakeOnSite(v => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={
+            fakeOnSite ? 'Turn off simulated on-site for testing' : 'Simulate on-site for testing'
+          }>
+          <Text style={styles.testGpsText}>
+            {fakeOnSite ? 'Test: use real GPS only' : 'Test: simulate on-site (near target)'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={styles.scopeWrapper}>
         <Text style={styles.scopeLabel}>Property Type</Text>
@@ -67,7 +92,7 @@ export default function SiteVisitScreen({
               <Text
                 style={[
                   styles.scopeButtonText,
-                  scope.value === siteScope ? {color: '#ffffff'} : null,
+                  scope.value === siteScope ? styles.scopeButtonTextActive : null,
                 ]}>
                 {scope.label}
               </Text>
@@ -108,9 +133,9 @@ export default function SiteVisitScreen({
       <TouchableOpacity
         style={[
           styles.completeButton,
-          {backgroundColor: gpsAllowed && violations.length > 0 ? colors.primary : '#9ca3af'},
+          effectiveOnSite && violations.length > 0 ? styles.completeButtonEnabled : styles.completeButtonDisabled,
         ]}
-        disabled={!gpsAllowed || violations.length === 0}
+        disabled={!effectiveOnSite || violations.length === 0}
         onPress={handleComplete}>
         <Text style={styles.completeButtonText}>Complete Site Visit</Text>
       </TouchableOpacity>
@@ -139,6 +164,15 @@ const styles = StyleSheet.create({
   siteInfo: {fontSize: 13, color: colors.mutedText, marginTop: 2},
   statusBadge: {marginTop: 12, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start'},
   statusText: {color: '#ffffff', fontSize: 12},
+  testGpsBtn: {
+    marginTop: 10,
+    alignSelf: 'stretch',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: colors.primaryLight,
+  },
+  testGpsText: {color: '#ffffff', fontSize: 12, fontWeight: '600', textAlign: 'center'},
   scopeWrapper: {marginTop: 16},
   scopeLabel: {fontSize: 13, color: colors.mutedText, marginBottom: 6},
   scopeButtons: {flexDirection: 'row'},
@@ -146,6 +180,7 @@ const styles = StyleSheet.create({
   scopeButtonActive: {backgroundColor: colors.primary},
   scopeButtonInactive: {backgroundColor: '#e5e7eb'},
   scopeButtonText: {fontSize: 12, color: colors.text},
+  scopeButtonTextActive: {color: '#ffffff'},
   sectionHeader: {marginTop: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
   sectionTitle: {fontSize: 16, fontWeight: '600', color: colors.text},
   addButton: {paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.primaryLight},
@@ -156,5 +191,7 @@ const styles = StyleSheet.create({
   violationNotes: {fontSize: 12, color: colors.text, marginTop: 6},
   emptyText: {marginTop: 16, fontSize: 12, color: colors.mutedText},
   completeButton: {marginTop: 16, paddingVertical: 14, borderRadius: 12, alignItems: 'center'},
+  completeButtonEnabled: {backgroundColor: colors.primary},
+  completeButtonDisabled: {backgroundColor: '#9ca3af'},
   completeButtonText: {color: '#ffffff', fontWeight: '600'},
 });

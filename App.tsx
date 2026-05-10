@@ -5,8 +5,21 @@
  * @format
  */
 
+import './src/i18n';
+import * as Sentry from '@sentry/react-native';
+import Config from 'react-native-config';
 import React from 'react';
+
+const sentryDsn = (Config.SENTRY_DSN || '').trim();
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    sendDefaultPii: false,
+    tracesSampleRate: __DEV__ ? 1.0 : 0.2,
+  });
+}
 import {StyleSheet} from 'react-native';
+import {NavigationContainer} from '@react-navigation/native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
@@ -36,7 +49,9 @@ export default function Root() {
       <QueryClientProvider client={queryClient}>
         <PaperProvider theme={appTheme}>
           <SafeAreaProvider>
-            <App />
+            <NavigationContainer>
+              <App />
+            </NavigationContainer>
           </SafeAreaProvider>
         </PaperProvider>
       </QueryClientProvider>

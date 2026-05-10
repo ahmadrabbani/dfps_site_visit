@@ -11,6 +11,8 @@ import {
   StatusBar,
   Animated,
   AccessibilityInfo,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Controller, useForm} from 'react-hook-form';
@@ -34,6 +36,9 @@ const loginSchema = z.object({
 const INPUT_RADIUS = 14;
 const BUTTON_RADIUS = 14;
 const CARD_RADIUS = 20;
+
+/** Avoid `Animated` native timers firing after Jest tears down the tree. */
+const SKIP_LOGIN_ANIMATIONS = process.env.NODE_ENV === 'test';
 
 export default function LoginScreen({onLogin}) {
   const theme = useTheme();
@@ -71,6 +76,15 @@ export default function LoginScreen({onLogin}) {
   const rootError = errors.root?.message;
 
   useEffect(() => {
+    if (SKIP_LOGIN_ANIMATIONS) {
+      headerOpacity.setValue(1);
+      headerTranslate.setValue(0);
+      logoScale.setValue(1);
+      cardOpacity.setValue(1);
+      cardTranslate.setValue(0);
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(headerOpacity, {
         toValue: 1,
@@ -114,6 +128,12 @@ export default function LoginScreen({onLogin}) {
     }
   }, [rootError]);
 
+  useEffect(() => {
+    if (submitting) {
+      AccessibilityInfo.announceForAccessibility?.('Logging in, please wait.');
+    }
+  }, [submitting]);
+
   const onValidSubmit = async ({username, password}) => {
     clearErrors('root');
     setSubmitting(true);
@@ -135,6 +155,15 @@ export default function LoginScreen({onLogin}) {
 
   return (
     <View style={styles.root} accessibilityLabel="Login screen">
+      <Modal visible={submitting} transparent animationType="fade" statusBarTranslucent accessibilityViewIsModal>
+        <View style={styles.loginOverlay} accessibilityLabel="Logging in, please wait">
+          <View style={styles.loginOverlayCard}>
+            <ActivityIndicator size="large" color="#003366" />
+            <Text style={styles.loginOverlayTitle}>Logging in</Text>
+            <Text style={styles.loginOverlaySubtitle}>Please wait…</Text>
+          </View>
+        </View>
+      </Modal>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ImageBackground
         source={backgroundImage}
@@ -297,7 +326,7 @@ export default function LoginScreen({onLogin}) {
                 <Button
                   mode="contained"
                   onPress={handleSubmit(onValidSubmit)}
-                  loading={submitting}
+                  loading={false}
                   disabled={submitting || !canSubmit}
                   style={styles.button}
                   contentStyle={styles.buttonContent}
@@ -319,6 +348,37 @@ export default function LoginScreen({onLogin}) {
 
 const styles = StyleSheet.create({
   root: {flex: 1},
+  loginOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 18, 36, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loginOverlayCard: {
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderRadius: 16,
+    paddingVertical: 28,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    minWidth: 260,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    shadowOffset: {width: 0, height: 4},
+  },
+  loginOverlayTitle: {
+    marginTop: 18,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#003366',
+  },
+  loginOverlaySubtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    color: '#4b5563',
+  },
   flex: {flex: 1},
   background: {flex: 1},
   backgroundImage: {resizeMode: 'cover'},

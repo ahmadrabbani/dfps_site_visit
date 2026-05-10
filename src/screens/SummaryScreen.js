@@ -3,6 +3,17 @@ import {View, Text, TouchableOpacity, StyleSheet, FlatList} from 'react-native';
 import {colors} from '../theme/colors';
 
 export default function SummaryScreen({visit, onDone}) {
+  if (!visit) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.header}>No visit data</Text>
+        <TouchableOpacity style={styles.button} onPress={onDone}>
+          <Text style={styles.buttonText}>Back to Dashboard</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Site Visit Completed</Text>
