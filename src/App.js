@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
-import {SafeAreaView, StatusBar, LogBox} from 'react-native';
+import {View, StatusBar, LogBox} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import LoginScreen from './screens/LoginScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import SiteVisitScreen from './screens/SiteVisitScreen';
@@ -72,10 +73,17 @@ export default function App() {
     setScreen('dashboard');
   };
 
+  if (screen === 'login') {
+    return (
+      <View style={{flex: 1}}>
+        <LoginScreen onLogin={handleLogin} />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={{flex: 1}}>
       <StatusBar barStyle="dark-content" />
-      {screen === 'login' && <LoginScreen onLogin={handleLogin} />}
       {screen === 'dashboard' && (
         <DashboardScreen user={user} onStartVisit={handleStartVisit} />
       )}

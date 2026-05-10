@@ -1,12 +1,47 @@
-const BASE_URL = 'http://103.8.115.199:91/dfps-site/public/index.php';
+import {getApiBaseUrl, USE_FAKE_API} from '../config/env';
+
+const FAKE_USER = {
+  id: 999,
+  name: 'Demo Officer',
+  token: 'dev-fake-token',
+};
+
+/** Shape expected by `ViolationFormScreen`: id, name, categories[{ id, name, isFixedAmount }] */
+function getFakePenaltyTypes(scope) {
+  const isCommercial = scope === 'commercial';
+  return [
+    {
+      id: 1,
+      name: isCommercial ? 'Demo commercial violation' : 'Demo residential violation',
+      categories: [
+        {id: 101, name: 'Ground floor', isFixedAmount: true},
+        {id: 102, name: 'Upper floor', isFixedAmount: false},
+      ],
+    },
+    {
+      id: 2,
+      name: 'Second demo type',
+      categories: [{id: 201, name: 'Category A', isFixedAmount: false}],
+    },
+  ];
+}
 
 export async function login(username, password) {
+  if (USE_FAKE_API) {
+    if (__DEV__) {
+      console.log('[login] USE_FAKE_API: skipping network (username length:', String(username || '').length, ')');
+    }
+    await new Promise(r => setTimeout(r, 320));
+    return {...FAKE_USER};
+  }
+
+  const BASE_URL = getApiBaseUrl();
   const url = BASE_URL + '?route=auth/login';
   const body = JSON.stringify({username, password});
   if (__DEV__) {
-    console.log('[login] POST', url, body);
-  } else {
-    globalThis.lastLoginRequest = {url, body};
+    console.log('[login] POST', url);
+  } else if (typeof global !== 'undefined') {
+    global.lastLoginRequest = {url};
   }
   const res = await fetch(url, {
     method: 'POST',
@@ -36,6 +71,12 @@ export async function login(username, password) {
 }
 
 export async function fetchViolationTypes(scope = 'residential') {
+  if (USE_FAKE_API) {
+    await new Promise(r => setTimeout(r, 220));
+    return getFakePenaltyTypes(scope);
+  }
+
+  const BASE_URL = getApiBaseUrl();
   const url = `${BASE_URL}?route=penalties/index&scope=${encodeURIComponent(scope)}`;
   const res = await fetch(url);
   if (!res.ok) {
@@ -47,6 +88,12 @@ export async function fetchViolationTypes(scope = 'residential') {
 }
 
 export async function pushSiteVisit(visit) {
+  if (USE_FAKE_API) {
+    await new Promise(r => setTimeout(r, 260));
+    return {ok: true, fake: true, localId: visit.localId};
+  }
+
+  const BASE_URL = getApiBaseUrl();
   const payload = {
     authToken: visit.authToken || 'demo-token',
     siteVisit: {

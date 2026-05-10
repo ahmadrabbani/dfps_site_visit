@@ -21,25 +21,49 @@ DerivedData
 *.ipa
 *.xcuserstate
 **/.xcode.env.local
+ios/build/
 
 # Android/IntelliJ
 #
 build/
 .idea
-.gradle
+# Gradle caches (large; recreated locally) — explicit paths + glob
+.gradle/
+**/.gradle/
 local.properties
 *.iml
 *.hprof
 .cxx/
+**/.cxx/
 *.keystore
 !debug.keystore
 .kotlin/
+# Android native build outputs (large; reproducible)
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/build/
+# Release binaries (large)
+*.apk
+*.aab
+# Gradle problem reports (HTML; local only)
+**/build/reports/problems/
 
 # node.js
 #
 node_modules/
 npm-debug.log
 yarn-error.log
+# Metro / RN generated launchers under node_modules (if tooling surfaces them)
+node_modules/.generated/
+
+# Env (react-native-config); copy from .env.example
+.env
+.env.local
+.env.*.local
+
+# Local AI / editor (machine-specific; not for repo)
+.claude/settings.local.json
 
 # fastlane
 #
