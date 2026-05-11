@@ -4,7 +4,9 @@ The violation form loads **`fetchViolationTypes(scope)`** (`src/services/api.js`
 
 ```json
 {
-  "data": [ /* array of penalty types */ ]
+  "data": [
+    /* array of penalty types */
+  ]
 }
 ```
 
@@ -26,34 +28,34 @@ GET {BASE_URL}?route=penalties/index&scope=residential
 
 ## Top level
 
-| Field | Role |
-|--------|------|
+| Field      | Role                                                                |
+| ---------- | ------------------------------------------------------------------- |
 | **`data`** | Array of **penalty types** (each row in the “Violation type” list). |
 
 ---
 
 ## Each item in `data` (one penalty type)
 
-| Field | Meaning |
-|--------|--------|
-| **`id`** | Stable id for this type. Saved on the violation as **`violationTypeId`**. |
-| **`name`** | Label shown in the type list (e.g. “Mandatory Space Violation”). |
-| **`scope`** | e.g. `"residential"` — should align with the **`scope`** query parameter. The API may return only rows for that scope. |
-| **`isSelectable`** | Backend hint: `true` means the officer may select this type. The current RN form **does not filter** on this; all items in `data` are shown unless you add a filter. |
-| **`autoAddToChallan`** | Backend business rule (e.g. auto-include on challan). **Not used** in the current form UI. |
-| **`displayOrder`** | Intended sort order (1, 2, 3…). The app **does not sort** by this unless you add something like `sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))`. |
-| **`categories`** | Sub-options (floor / band / “General”). User must pick one category for **`handleSave`** validation (unless you change that logic). |
+| Field                  | Meaning                                                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`id`**               | Stable id for this type. Saved on the violation as **`violationTypeId`**.                                                                                            |
+| **`name`**             | Label shown in the type list (e.g. “Mandatory Space Violation”).                                                                                                     |
+| **`scope`**            | e.g. `"residential"` — should align with the **`scope`** query parameter. The API may return only rows for that scope.                                               |
+| **`isSelectable`**     | Backend hint: `true` means the officer may select this type. The current RN form **does not filter** on this; all items in `data` are shown unless you add a filter. |
+| **`autoAddToChallan`** | Backend business rule (e.g. auto-include on challan). **Not used** in the current form UI.                                                                           |
+| **`displayOrder`**     | Intended sort order (1, 2, 3…). The app **does not sort** by this unless you add something like `sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))`.     |
+| **`categories`**       | Sub-options (floor / band / “General”). User must pick one category for **`handleSave`** validation (unless you change that logic).                                  |
 
 ---
 
 ## Each item in `categories`
 
-| Field | Meaning |
-|--------|--------|
-| **`id`** | Saved as **`violationCategoryId`**. |
-| **`name`** | Shown in the category table; used for **`categoryLabel`** / **`floorLabel`** in the saved violation. |
-| **`penaltyRate`** | Shown in the “Penalty” column (numeric). |
-| **`tokenFee`** | Optional; if missing or `null`, the UI shows **“—”** in the token fee column. |
+| Field               | Meaning                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`id`**            | Saved as **`violationCategoryId`**.                                                                                                                                                                     |
+| **`name`**          | Shown in the category table; used for **`categoryLabel`** / **`floorLabel`** in the saved violation.                                                                                                    |
+| **`penaltyRate`**   | Shown in the “Penalty” column (numeric).                                                                                                                                                                |
+| **`tokenFee`**      | Optional; if missing or `null`, the UI shows **“—”** in the token fee column.                                                                                                                           |
 | **`isFixedAmount`** | Drives **validation** in `ViolationFormScreen`: if **`false`**, the user must enter **area** (or calculate from length × width) before Save. If **`true`**, area is **not** required for that category. |
 
 ---

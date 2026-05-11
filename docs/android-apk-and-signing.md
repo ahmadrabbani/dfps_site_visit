@@ -2,16 +2,16 @@
 
 ## One-command builds (npm)
 
-| Command | Gradle task (default) | Typical output |
-|--------|------------------------|----------------|
-| `npm run apk:debug` | `assembleDebug` | `android/app/build/outputs/apk/debug/app-debug.apk` |
-| `npm run apk:debug:clean` | `:app:clean` then `assembleDebug` | Same path (forces fresh JS bundle + outputs) |
-| `npm run apk:debug:fresh` | `clean` + `assembleDebug -PbundleInDebug=true` | Forces debug build to include a freshly bundled JS payload |
-| `npm run apk:install` | — (ADB) | Installs existing `app-debug.apk` on a connected device/emulator (`adb install -r …`) |
-| `npm run apk:debug:install` | `assembleDebug` + ADB | Build debug APK, then install |
-| `npm run apk:debug:clean:install` | `clean` + `assembleDebug` + ADB | Clean rebuild, then install |
-| `npm run apk` | *(same as above)* | **Shortcut** for `apk:debug:clean:install` |
-| `npm run apk:release` | `assembleRelease` | `android/app/build/outputs/apk/release/app-release.apk` |
+| Command                           | Gradle task (default)                          | Typical output                                                                        |
+| --------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `npm run apk:debug`               | `assembleDebug`                                | `android/app/build/outputs/apk/debug/app-debug.apk`                                   |
+| `npm run apk:debug:clean`         | `:app:clean` then `assembleDebug`              | Same path (forces fresh JS bundle + outputs)                                          |
+| `npm run apk:debug:fresh`         | `clean` + `assembleDebug -PbundleInDebug=true` | Forces debug build to include a freshly bundled JS payload                            |
+| `npm run apk:install`             | — (ADB)                                        | Installs existing `app-debug.apk` on a connected device/emulator (`adb install -r …`) |
+| `npm run apk:debug:install`       | `assembleDebug` + ADB                          | Build debug APK, then install                                                         |
+| `npm run apk:debug:clean:install` | `clean` + `assembleDebug` + ADB                | Clean rebuild, then install                                                           |
+| `npm run apk`                     | _(same as above)_                              | **Shortcut** for `apk:debug:clean:install`                                            |
+| `npm run apk:release`             | `assembleRelease`                              | `android/app/build/outputs/apk/release/app-release.apk`                               |
 
 These run `react-native build-android` with the appropriate variant so they work on Windows and macOS without calling `gradlew.bat` / `./gradlew` manually.
 
