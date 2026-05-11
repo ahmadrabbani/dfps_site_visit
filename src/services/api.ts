@@ -1,4 +1,5 @@
 import {getApiBaseUrl, USE_FAKE_API} from '../config/env';
+import type {PendingVisitBase, SiteVisitViolation} from './storage';
 
 const FAKE_USER = {
   id: 999,
@@ -6,8 +7,28 @@ const FAKE_USER = {
   token: 'dev-fake-token',
 };
 
-/** Shape expected by `ViolationFormScreen`: id, name, categories[{ id, name, isFixedAmount }] */
-function getFakePenaltyTypes(scope) {
+export interface SessionUser {
+  id: number | string;
+  name: string;
+  token: string;
+}
+
+export interface PenaltyCategory {
+  id: number;
+  name: string;
+  isFixedAmount: boolean;
+  penaltyRate?: string | number;
+  tokenFee?: string | number | null;
+}
+
+export interface PenaltyType {
+  id: number;
+  name: string;
+  categories: PenaltyCategory[];
+}
+
+/** Shape expected by `ViolationFormScreen` */
+function getFakePenaltyTypes(scope: string): PenaltyType[] {
   const isCommercial = scope === 'commercial';
   return [
     {
@@ -26,22 +47,22 @@ function getFakePenaltyTypes(scope) {
   ];
 }
 
-export async function login(username, password) {
+export async function login(username: string, password: string): Promise<SessionUser> {
   if (USE_FAKE_API) {
     if (__DEV__) {
       console.log('[login] USE_FAKE_API: skipping network (username length:', String(username || '').length, ')');
     }
-    await new Promise(r => setTimeout(r, 320));
+    await new Promise<void>(resolve => setTimeout(resolve, 320));
     return {...FAKE_USER};
   }
 
   const BASE_URL = getApiBaseUrl();
-  const url = BASE_URL + '?route=auth/login';
+  const url = `${BASE_URL}?route=auth/login`;
   const body = JSON.stringify({username, password});
   if (__DEV__) {
     console.log('[login] POST', url);
-  } else if (typeof global !== 'undefined') {
-    global.lastLoginRequest = {url};
+  } else if (typeof globalThis !== 'undefined') {
+    (globalThis as {lastLoginRequest?: {url: string}}).lastLoginRequest = {url};
   }
   const res = await fetch(url, {
     method: 'POST',
@@ -50,16 +71,16 @@ export async function login(username, password) {
   });
 
   const text = await res.text();
-  let payload;
+  let payload: {data?: {user?: SessionUser; token?: string}; message?: string};
   try {
-    payload = text ? JSON.parse(text) : {};
-  } catch (err) {
-    throw new Error('Login failed: ' + text);
+    payload = text ? (JSON.parse(text) as typeof payload) : {};
+  } catch {
+    throw new Error(`Login failed: ${text}`);
   }
 
   if (!res.ok) {
     const message = payload?.message ? String(payload.message) : text || 'Unknown error';
-    throw new Error('Login failed: ' + message);
+    throw new Error(`Login failed: ${message}`);
   }
 
   const data = payload?.data || {};
@@ -70,9 +91,9 @@ export async function login(username, password) {
   return {...data.user, token: data.token};
 }
 
-export async function fetchViolationTypes(scope = 'residential') {
+export async function fetchViolationTypes(scope = 'residential'): Promise<PenaltyType[]> {
   if (USE_FAKE_API) {
-    await new Promise(r => setTimeout(r, 220));
+    await new Promise<void>(resolve => setTimeout(resolve, 220));
     return getFakePenaltyTypes(scope);
   }
 
@@ -81,15 +102,15 @@ export async function fetchViolationTypes(scope = 'residential') {
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error('Failed to load penalties: ' + text);
+    throw new Error(`Failed to load penalties: ${text}`);
   }
-  const payload = await res.json();
+  const payload = (await res.json()) as {data?: PenaltyType[]};
   return payload.data || [];
 }
 
-export async function pushSiteVisit(visit) {
+export async function pushSiteVisit(visit: PendingVisitBase): Promise<unknown> {
   if (USE_FAKE_API) {
-    await new Promise(r => setTimeout(r, 260));
+    await new Promise<void>(resolve => setTimeout(resolve, 260));
     return {ok: true, fake: true, localId: visit.localId};
   }
 
@@ -106,7 +127,7 @@ export async function pushSiteVisit(visit) {
         lat: visit.startLat,
         lon: visit.startLon,
       },
-      violations: visit.violations.map(v => ({
+      violations: visit.violations.map((v: SiteVisitViolation) => ({
         type: v.typeLabel || v.type,
         violationTypeId: v.violationTypeId || null,
         violationCategoryId: v.violationCategoryId || null,
@@ -121,7 +142,7 @@ export async function pushSiteVisit(visit) {
     },
   };
 
-  const res = await fetch(BASE_URL + '?route=sitevisit/store', {
+  const res = await fetch(`${BASE_URL}?route=sitevisit/store`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify(payload),
@@ -129,8 +150,8 @@ export async function pushSiteVisit(visit) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error('Upload failed: ' + text);
+    throw new Error(`Upload failed: ${text}`);
   }
 
-  return res.json();
+  return res.json() as Promise<unknown>;
 }

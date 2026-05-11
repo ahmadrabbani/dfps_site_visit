@@ -4,16 +4,22 @@ import {Appbar} from 'react-native-paper';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors} from '../theme/colors';
 import {useAuthNavigation} from '../navigation/AuthNavigationContext';
+import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
 
-const TITLES = {
-  Dashboard: 'Dashboard',
-  SiteVisit: 'Site visit',
-  ViolationForm: 'Violation',
-  Summary: 'Summary',
+const TITLES: Record<string, string> = {
+  [MAIN_STACK_ROUTES.Dashboard]: 'Dashboard',
+  [MAIN_STACK_ROUTES.SiteVisit]: 'Site visit',
+  [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
+  [MAIN_STACK_ROUTES.Summary]: 'Summary',
   PendingUploads: 'Pending uploads',
 };
 
-export default function AppHeader({navigation, routeName}) {
+interface AppHeaderProps {
+  navigation: any;
+  routeName: string;
+}
+
+export default function AppHeader({navigation, routeName}: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const {onSignOut} = useAuthNavigation();
   const title = TITLES[routeName] || 'DFPS';
@@ -29,11 +35,7 @@ export default function AppHeader({navigation, routeName}) {
   return (
     <>
       <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
-      <Appbar.Header
-        mode="center-aligned"
-        elevated
-        statusBarHeight={insets.top}
-        style={styles.header}>
+      <Appbar.Header mode="center-aligned" elevated statusBarHeight={insets.top} style={styles.header}>
         {canGoBack ? (
           <Appbar.BackAction
             accessibilityLabel="Go back"

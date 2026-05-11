@@ -39,6 +39,13 @@ jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
+  withScope: jest.fn(fn => {
+    const scope = {
+      setTag: jest.fn(),
+      setExtra: jest.fn(),
+    };
+    return fn(scope);
+  }),
 }));
 
 jest.mock('react-native-maps', () => {

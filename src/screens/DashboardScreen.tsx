@@ -1,8 +1,14 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {colors} from '../theme/colors';
+import type {SessionUser} from '../services/api';
 
-export default function DashboardScreen({user, onStartVisit}) {
+interface DashboardScreenProps {
+  user: SessionUser;
+  onStartVisit: () => void;
+}
+
+export default function DashboardScreen({user, onStartVisit}: DashboardScreenProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.greeting}>Welcome, {user.name}</Text>
@@ -10,9 +16,7 @@ export default function DashboardScreen({user, onStartVisit}) {
       <TouchableOpacity style={styles.primaryButton} onPress={onStartVisit}>
         <Text style={styles.buttonText}>Initiate Site Visit</Text>
       </TouchableOpacity>
-      <Text style={styles.helper}>
-        Button becomes active near site location (GPS).
-      </Text>
+      <Text style={styles.helper}>Button becomes active near site location (GPS).</Text>
     </View>
   );
 }

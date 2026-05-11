@@ -1,8 +1,14 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, FlatList} from 'react-native';
 import {colors} from '../theme/colors';
+import type {PendingVisit} from '../services/storage';
 
-export default function SummaryScreen({visit, onDone}) {
+interface SummaryScreenProps {
+  visit?: PendingVisit | null;
+  onDone: () => void;
+}
+
+export default function SummaryScreen({visit, onDone}: SummaryScreenProps) {
   if (!visit) {
     return (
       <View style={styles.container}>
@@ -23,14 +29,12 @@ export default function SummaryScreen({visit, onDone}) {
 
       <FlatList
         data={visit.violations}
-        keyExtractor={(item, idx) => idx.toString()}
+        keyExtractor={(_, idx) => idx.toString()}
         renderItem={({item}) => (
           <View style={styles.card}>
             <Text style={styles.type}>{item.typeLabel || item.type}</Text>
             {item.categoryLabel || item.floorLabel ? (
-              <Text style={styles.meta}>
-                Category/Floor: {item.floorLabel || item.categoryLabel}
-              </Text>
+              <Text style={styles.meta}>Category/Floor: {item.floorLabel || item.categoryLabel}</Text>
             ) : null}
             {item.area ? <Text style={styles.meta}>Area: {item.area} sq.ft</Text> : null}
             {item.notes ? <Text style={styles.notes}>{item.notes}</Text> : null}

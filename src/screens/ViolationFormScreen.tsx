@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -8,68 +8,73 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
+import {useQuery} from '@tanstack/react-query';
+import {launchCamera} from 'react-native-image-picker';
 import {colors} from '../theme/colors';
-import {fetchViolationTypes} from '../services/api';
+import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
+import {notifyInfo, notifySuccess} from '../utils/notify';
+import type {SiteVisitViolation} from '../services/storage';
+import type {SiteScope} from '../types/app';
 
-export default function ViolationFormScreen({scope, onScopeChange, onSave, onCancel}) {
-  const [penaltyTypes, setPenaltyTypes] = useState([]);
-  const [selectedType, setSelectedType] = useState(null);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+interface ViolationFormScreenProps {
+  scope: SiteScope;
+  onScopeChange: (scope: SiteScope) => void;
+  onSave: (violation: SiteVisitViolation) => void;
+  onCancel: () => void;
+}
+
+export default function ViolationFormScreen({
+  scope,
+  onScopeChange,
+  onSave,
+  onCancel,
+}: ViolationFormScreenProps) {
+  const [selectedType, setSelectedType] = useState<PenaltyType | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<PenaltyCategory | null>(null);
   const [length, setLength] = useState('');
   const [width, setWidth] = useState('');
   const [area, setArea] = useState('');
   const [notes, setNotes] = useState('');
   const [floorLabel, setFloorLabel] = useState('');
-  const [reloadKey, setReloadKey] = useState(0);
-  const scopes = [
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [capturingPhoto, setCapturingPhoto] = useState(false);
+  const scopes: Array<{label: string; value: SiteScope}> = [
     {label: 'Residential', value: 'residential'},
     {label: 'Commercial', value: 'commercial'},
   ];
 
+  const {
+    data: penaltyTypes = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['violationTypes', scope],
+    queryFn: () => fetchViolationTypes(scope),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const types = await fetchViolationTypes(scope);
-        if (!mounted) {
-          return;
-        }
-        setPenaltyTypes(types);
-        if (types.length > 0) {
-          const defaultType = types[0];
-          setSelectedType(defaultType);
-          if (defaultType.categories.length > 0) {
-            setSelectedCategory(defaultType.categories[0]);
-            setFloorLabel(defaultType.categories[0].name);
-          } else {
-            setSelectedCategory(null);
-            setFloorLabel('');
-          }
-        } else {
-          setSelectedType(null);
-          setSelectedCategory(null);
-          setFloorLabel('');
-        }
-      } catch (err) {
-        if (mounted) {
-          setError(err.message);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [scope, reloadKey]);
+    if (!penaltyTypes.length) {
+      setSelectedType(null);
+      return;
+    }
+    setSelectedType(prev => penaltyTypes.find(pt => pt.id === prev?.id) || penaltyTypes[0]);
+  }, [penaltyTypes]);
+
+  useEffect(() => {
+    if (!selectedType) {
+      setSelectedCategory(null);
+      return;
+    }
+    setSelectedCategory(
+      prev => selectedType.categories.find(cat => cat.id === prev?.id) || selectedType.categories[0] || null,
+    );
+  }, [selectedType]);
 
   useEffect(() => {
     if (selectedCategory) {
@@ -77,7 +82,7 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
     }
   }, [selectedCategory]);
 
-  const handleSelectType = typeOption => {
+  const handleSelectType = (typeOption: PenaltyType) => {
     setSelectedType(typeOption);
     if (typeOption.categories.length > 0) {
       setSelectedCategory(typeOption.categories[0]);
@@ -86,17 +91,27 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
     }
   };
 
-  const handleSelectCategory = category => {
+  const handleSelectCategory = (category: PenaltyCategory) => {
     setSelectedCategory(category);
   };
 
-  const handleCalculateArea = () => {
+  const calculatedArea = useMemo(() => {
     const l = parseFloat(length);
     const w = parseFloat(width);
-    if (!isNaN(l) && !isNaN(w)) {
-      setArea(String(l * w));
+    if (!Number.isNaN(l) && !Number.isNaN(w)) {
+      return l * w;
     }
-  };
+    return null;
+  }, [length, width]);
+
+  const handleCalculateArea = useCallback(() => {
+    if (calculatedArea != null) {
+      setArea(String(calculatedArea));
+      notifyInfo('Area calculated.');
+      return;
+    }
+    notifyInfo('Enter valid length and width first.');
+  }, [calculatedArea]);
 
   const handleSave = () => {
     if (!selectedType || !selectedCategory) {
@@ -107,7 +122,7 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
       Alert.alert('Area required', 'Enter an area or calculate it for this violation.');
       return;
     }
-    const v = {
+    const v: SiteVisitViolation = {
       violationTypeId: selectedType.id,
       violationCategoryId: selectedCategory.id,
       typeLabel: selectedType.name,
@@ -117,9 +132,47 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
       width: width ? parseFloat(width) : null,
       area: area ? parseFloat(area) : null,
       notes,
-      photoBase64: null,
+      photoBase64,
     };
+    notifySuccess('Violation added to this visit.');
     onSave(v);
+  };
+
+  const handleCapturePhoto = async () => {
+    setCapturingPhoto(true);
+    try {
+      const result = await launchCamera({
+        mediaType: 'photo',
+        includeBase64: true,
+        saveToPhotos: false,
+        quality: 0.7,
+        maxWidth: 1280,
+        maxHeight: 1280,
+      });
+
+      if (result.didCancel) {
+        notifyInfo('Photo capture cancelled.');
+        return;
+      }
+
+      if (result.errorCode || result.errorMessage) {
+        const msg = result.errorMessage || result.errorCode || 'Unable to capture photo.';
+        Alert.alert('Camera error', msg);
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.base64) {
+        Alert.alert('Photo missing', 'Photo was captured, but image data is unavailable.');
+        return;
+      }
+
+      setPhotoBase64(asset.base64);
+      setPhotoUri(asset.uri || null);
+      notifySuccess('Photo attached to this violation.');
+    } finally {
+      setCapturingPhoto(false);
+    }
   };
 
   return (
@@ -139,7 +192,7 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
               <Text
                 style={[
                   styles.scopeButtonText,
-                  option.value === scope ? {color: '#ffffff'} : null,
+                  option.value === scope ? styles.scopeButtonTextActive : null,
                 ]}>
                 {option.label}
               </Text>
@@ -155,8 +208,8 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
         </View>
       ) : error ? (
         <View style={styles.loader}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.smallButton} onPress={() => setReloadKey(key => key + 1)}>
+          <Text style={styles.errorText}>{(error as Error)?.message || 'Failed to load penalties.'}</Text>
+          <TouchableOpacity style={styles.smallButton} onPress={() => refetch()}>
             <Text style={styles.smallButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -177,7 +230,7 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
                   style={[
                     styles.typeRowText,
                     pt.id === (selectedType ? selectedType.id : null)
-                      ? {color: '#ffffff'}
+                      ? styles.typeRowTextActive
                       : null,
                   ]}>
                   {pt.name}
@@ -199,16 +252,12 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
                   style={[
                     styles.tableRow,
                     styles.tableDataRow,
-                    selectedCategory && cat.id === selectedCategory.id
-                      ? styles.tableRowActive
-                      : null,
+                    selectedCategory && cat.id === selectedCategory.id ? styles.tableRowActive : null,
                   ]}
                   onPress={() => handleSelectCategory(cat)}>
                   <Text style={[styles.tableCell, styles.cellCategory]}>{cat.name}</Text>
                   <Text style={[styles.tableCell, styles.cellRate]}>{cat.penaltyRate}</Text>
-                  <Text style={[styles.tableCell, styles.cellRate]}>
-                    {cat.tokenFee ? cat.tokenFee : '—'}
-                  </Text>
+                  <Text style={[styles.tableCell, styles.cellRate]}>{cat.tokenFee ? cat.tokenFee : '-'}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -219,51 +268,57 @@ export default function ViolationFormScreen({scope, onScopeChange, onSave, onCan
       )}
 
       <Text style={styles.label}>Floor / Custom Label</Text>
-      <TextInput style={styles.input} value={floorLabel} onChangeText={setFloorLabel} placeholder="e.g. Ground Floor" />
+      <TextInput
+        style={styles.input}
+        value={floorLabel}
+        onChangeText={setFloorLabel}
+        placeholder="e.g. Ground Floor"
+      />
 
       <Text style={styles.label}>Length (ft)</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={length}
-        onChangeText={setLength}
-      />
+      <TextInput style={styles.input} keyboardType="numeric" value={length} onChangeText={setLength} />
 
       <Text style={styles.label}>Width (ft)</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={width}
-        onChangeText={setWidth}
-      />
+      <TextInput style={styles.input} keyboardType="numeric" value={width} onChangeText={setWidth} />
 
       <TouchableOpacity style={styles.smallButton} onPress={handleCalculateArea}>
         <Text style={styles.smallButtonText}>Calculate Area</Text>
       </TouchableOpacity>
 
       <Text style={styles.label}>Area (sq.ft)</Text>
-      <TextInput
-        style={styles.input}
-        keyboardType="numeric"
-        value={area}
-        onChangeText={setArea}
-      />
+      <TextInput style={styles.input} keyboardType="numeric" value={area} onChangeText={setArea} />
 
       <Text style={styles.label}>Notes</Text>
       <TextInput
-        style={[styles.input, {height: 80}]}
+        style={[styles.input, styles.notesInput]}
         multiline
         value={notes}
         onChangeText={setNotes}
         placeholder="Describe the violation"
       />
 
+      <Text style={styles.label}>Photo Evidence</Text>
+      <TouchableOpacity
+        style={[styles.smallButton, capturingPhoto ? styles.smallButtonDisabled : null]}
+        onPress={handleCapturePhoto}
+        disabled={capturingPhoto}>
+        <Text style={styles.smallButtonText}>
+          {capturingPhoto ? 'Opening camera...' : photoBase64 ? 'Retake Photo' : 'Take Photo'}
+        </Text>
+      </TouchableOpacity>
+      {photoBase64 ? (
+        <Text style={styles.photoMeta}>Photo attached and will upload with this violation.</Text>
+      ) : (
+        <Text style={styles.photoMeta}>Optional: capture a photo for evidence.</Text>
+      )}
+      {photoUri ? <Image source={{uri: photoUri}} style={styles.photoPreview} /> : null}
+
       <View style={styles.row}>
         <TouchableOpacity style={[styles.actionButton, styles.cancel]} onPress={onCancel}>
           <Text style={styles.actionText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.save]} onPress={handleSave}>
-          <Text style={[styles.actionText, {color: '#ffffff'}]}>Save</Text>
+          <Text style={[styles.actionText, styles.actionTextOnPrimary]}>Save</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -280,13 +335,16 @@ const styles = StyleSheet.create({
   scopeButtonActive: {backgroundColor: colors.primary},
   scopeButtonInactive: {backgroundColor: '#e5e7eb'},
   scopeButtonText: {fontSize: 12, color: colors.text},
+  scopeButtonTextActive: {color: '#ffffff'},
   label: {fontSize: 13, color: colors.mutedText, marginTop: 12},
   input: {borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, padding: 10, marginTop: 4, backgroundColor: '#ffffff'},
+  notesInput: {height: 80},
   typeList: {marginTop: 8},
   typeRowItem: {paddingVertical: 8, paddingHorizontal: 10, borderRadius: 10, marginBottom: 6},
   typeRowItemActive: {backgroundColor: colors.primary},
   typeRowItemInactive: {backgroundColor: '#e5e7eb'},
   typeRowText: {fontSize: 13, color: colors.text},
+  typeRowTextActive: {color: '#ffffff'},
   table: {marginTop: 12, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 10, overflow: 'hidden'},
   tableRow: {flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 8},
   tableHeader: {backgroundColor: '#f3f4f6'},
@@ -297,7 +355,18 @@ const styles = StyleSheet.create({
   cellRate: {flex: 1, textAlign: 'right'},
   emptyText: {fontSize: 12, color: colors.mutedText, marginTop: 8},
   smallButton: {marginTop: 8, alignSelf: 'flex-start', backgroundColor: colors.primaryLight, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8},
+  smallButtonDisabled: {opacity: 0.7},
   smallButtonText: {color: '#ffffff', fontSize: 12},
+  photoMeta: {fontSize: 12, color: colors.mutedText, marginTop: 8},
+  photoPreview: {
+    width: '100%',
+    height: 180,
+    marginTop: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f3f4f6',
+  },
   loader: {marginTop: 20, alignItems: 'center'},
   loaderText: {marginTop: 8, fontSize: 12, color: colors.mutedText},
   errorText: {fontSize: 12, color: colors.danger, textAlign: 'center'},
@@ -306,4 +375,5 @@ const styles = StyleSheet.create({
   cancel: {backgroundColor: '#e5e7eb', marginRight: 8},
   save: {backgroundColor: colors.primary, marginLeft: 8},
   actionText: {fontWeight: '600', color: colors.text},
+  actionTextOnPrimary: {color: '#ffffff'},
 });

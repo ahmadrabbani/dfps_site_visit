@@ -14,13 +14,16 @@ import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
 import SummaryScreen from '../screens/SummaryScreen';
-import PendingUploadsScreen from '../screens/PendingUploadsScreen';
 import {addPendingVisit} from '../services/storage';
+import {notifySuccess} from '../utils/notify';
+import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
+import type {AuthNavigationContextValue, SiteScope, ViolationDraft} from '../types/app';
+import type {SessionUser} from '../services/api';
 
 const Drawer = createDrawerNavigator();
 const Stack = createNativeStackNavigator();
 
-function AppDrawerContent(props) {
+function AppDrawerContent(props: any) {
   const {navigation} = props;
   const {onSignOut} = useAuthNavigation();
 
@@ -29,21 +32,14 @@ function AppDrawerContent(props) {
       <DrawerItem
         label="Dashboard"
         onPress={() => {
-          navigation.navigate('Main', {screen: 'Dashboard'});
+          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.Dashboard});
           navigation.closeDrawer();
         }}
       />
       <DrawerItem
         label="Site visit"
         onPress={() => {
-          navigation.navigate('Main', {screen: 'SiteVisit'});
-          navigation.closeDrawer();
-        }}
-      />
-      <DrawerItem
-        label="Pending uploads"
-        onPress={() => {
-          navigation.navigate('Main', {screen: 'PendingUploads'});
+          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.SiteVisit});
           navigation.closeDrawer();
         }}
       />
@@ -58,12 +54,12 @@ function AppDrawerContent(props) {
   );
 }
 
-function MainStackHeader(props) {
+function MainStackHeader(props: any) {
   return <AppHeader navigation={props.navigation} routeName={props.route.name} />;
 }
 
 function DashboardRouteScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const {user, setSiteScope} = useAuthNavigation();
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
@@ -71,7 +67,7 @@ function DashboardRouteScreen() {
         user={user}
         onStartVisit={() => {
           setSiteScope('residential');
-          navigation.navigate('SiteVisit');
+          navigation.navigate(MAIN_STACK_ROUTES.SiteVisit);
         }}
       />
     </SafeAreaView>
@@ -79,7 +75,7 @@ function DashboardRouteScreen() {
 }
 
 function SiteVisitRouteScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const {user, siteScope, setSiteScope, violationDraftRef} = useAuthNavigation();
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
@@ -89,7 +85,7 @@ function SiteVisitRouteScreen() {
         onScopeChange={setSiteScope}
         onAddViolation={(currentViolations, setViolations) => {
           violationDraftRef.current = {currentViolations, setViolations};
-          navigation.navigate('ViolationForm');
+          navigation.navigate(MAIN_STACK_ROUTES.ViolationForm);
         }}
         onCompleteVisit={async (violations, scopeAtVisit) => {
           const now = new Date().toISOString();
@@ -107,7 +103,8 @@ function SiteVisitRouteScreen() {
             violations,
           };
           await addPendingVisit(visit);
-          navigation.navigate('Summary', {visit});
+          notifySuccess('Site visit saved on device. It will sync when online.');
+          navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit});
         }}
       />
     </SafeAreaView>
@@ -115,7 +112,7 @@ function SiteVisitRouteScreen() {
 }
 
 function ViolationFormRouteScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const {siteScope, setSiteScope, violationDraftRef} = useAuthNavigation();
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
@@ -141,25 +138,17 @@ function ViolationFormRouteScreen() {
 }
 
 function SummaryRouteScreen() {
-  const navigation = useNavigation();
-  const route = useRoute();
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const visit = route.params?.visit;
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <SummaryScreen
         visit={visit}
         onDone={() => {
-          navigation.reset({index: 0, routes: [{name: 'Dashboard'}]});
+          navigation.reset({index: 0, routes: [{name: MAIN_STACK_ROUTES.Dashboard}]});
         }}
       />
-    </SafeAreaView>
-  );
-}
-
-function PendingUploadsRouteScreen() {
-  return (
-    <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
-      <PendingUploadsScreen />
     </SafeAreaView>
   );
 }
@@ -172,17 +161,30 @@ function MainStack() {
         header: MainStackHeader,
         animation: 'slide_from_right',
       }}>
-      <Stack.Screen name="Dashboard" component={DashboardRouteScreen} />
-      <Stack.Screen name="SiteVisit" component={SiteVisitRouteScreen} />
-      <Stack.Screen name="ViolationForm" component={ViolationFormRouteScreen} />
-      <Stack.Screen name="Summary" component={SummaryRouteScreen} />
-      <Stack.Screen name="PendingUploads" component={PendingUploadsRouteScreen} />
+      <Stack.Screen name={MAIN_STACK_ROUTES.Dashboard} component={DashboardRouteScreen} />
+      <Stack.Screen name={MAIN_STACK_ROUTES.SiteVisit} component={SiteVisitRouteScreen} />
+      <Stack.Screen name={MAIN_STACK_ROUTES.ViolationForm} component={ViolationFormRouteScreen} />
+      <Stack.Screen name={MAIN_STACK_ROUTES.Summary} component={SummaryRouteScreen} />
     </Stack.Navigator>
   );
 }
 
-export default function AuthenticatedFlow({user, siteScope, setSiteScope, violationDraftRef, onSignOut}) {
-  const value = useMemo(
+interface AuthenticatedFlowProps {
+  user: SessionUser;
+  siteScope: SiteScope;
+  setSiteScope: (scope: SiteScope) => void;
+  violationDraftRef: React.MutableRefObject<ViolationDraft | null>;
+  onSignOut: () => void | Promise<void>;
+}
+
+export default function AuthenticatedFlow({
+  user,
+  siteScope,
+  setSiteScope,
+  violationDraftRef,
+  onSignOut,
+}: AuthenticatedFlowProps) {
+  const value = useMemo<AuthNavigationContextValue>(
     () => ({user, siteScope, setSiteScope, violationDraftRef, onSignOut}),
     [user, siteScope, setSiteScope, violationDraftRef, onSignOut],
   );
@@ -197,7 +199,7 @@ export default function AuthenticatedFlow({user, siteScope, setSiteScope, violat
           swipeEnabled: true,
           overlayColor: 'rgba(0,0,0,0.35)',
         }}>
-        <Drawer.Screen name="Main" component={MainStack} options={{title: 'Menu'}} />
+        <Drawer.Screen name={DRAWER_ROUTES.Main} component={MainStack} options={{title: 'Menu'}} />
       </Drawer.Navigator>
     </AuthNavigationProvider>
   );

@@ -5,7 +5,14 @@
   "scripts": {
     "start": "react-native start",
     "android": "react-native run-android",
-    "apk:debug": "react-native build-android",
+    "apk:debug": "react-native build-android --tasks assembleDebug",
+    "apk:debug:clean": "react-native build-android --tasks clean && react-native build-android --tasks assembleDebug",
+    "apk:debug:fresh": "react-native build-android --tasks clean && react-native build-android --tasks assembleDebug --extra-params \"-PbundleInDebug=true\"",
+    "apk:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "apk:debug:install": "npm run apk:debug && npm run apk:install",
+    "apk:debug:clean:install": "npm run apk:debug:clean && npm run apk:install",
+    "apk": "npm run apk:debug:clean:install",
+    "apk:release": "react-native build-android --tasks assembleRelease",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "test": "jest"
@@ -32,7 +39,6 @@
     "react-native": "0.82.1",
     "react-native-config": "^1.6.1",
     "react-native-fast-image": "^8.6.3",
-    "react-native-fs": "^2.20.0",
     "react-native-geolocation-service": "^5.3.1",
     "react-native-gesture-handler": "^2.31.2",
     "react-native-image-picker": "^7.1.0",

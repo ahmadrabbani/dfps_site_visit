@@ -20,11 +20,13 @@ if (sentryDsn) {
 }
 import {StyleSheet} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
+import type {LinkingOptions, ParamListBase} from '@react-navigation/native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {MD3LightTheme, PaperProvider} from 'react-native-paper';
 import App from './src/App';
+import {linking} from './src/navigation/linking';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,13 +45,15 @@ const appTheme = {
   },
 };
 
+const appLinking = linking as LinkingOptions<ParamListBase>;
+
 export default function Root() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
         <PaperProvider theme={appTheme}>
           <SafeAreaProvider>
-            <NavigationContainer>
+            <NavigationContainer linking={appLinking}>
               <App />
             </NavigationContainer>
           </SafeAreaProvider>

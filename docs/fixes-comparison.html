@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DFPS Fixes Comparison</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+        color: #1f2937;
+        background: #f9fafb;
+      }
+      h1 {
+        margin: 0 0 8px;
+        color: #003366;
+      }
+      p {
+        margin: 0 0 16px;
+        color: #4b5563;
+      }
+      .last-updated {
+        margin: -8px 0 16px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 980px;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+        vertical-align: top;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        background: #f3f4f6;
+        color: #111827;
+        font-weight: 700;
+      }
+      tr:hover td {
+        background: #f9fafb;
+      }
+      .fixed {
+        color: #065f46;
+        font-weight: 700;
+      }
+      .partial {
+        color: #92400e;
+        font-weight: 700;
+      }
+      code {
+        background: #f3f4f6;
+        padding: 1px 4px;
+        border-radius: 4px;
+        font-family: Consolas, monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>DFPS Site Visit - Fixes Comparison</h1>
+    <p>Detailed comparison of fixes and practical gains from <code>docs/claude.md</code>.</p>
+    <p class="last-updated">Last updated: 2026-05-11 (synced with current <code>src/</code> TypeScript paths)</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fix ID</th>
+            <th>Status</th>
+            <th>Before (Issue)</th>
+            <th>After (Fix)</th>
+            <th>What You Gained</th>
+            <th>Main Files</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>C3</td>
+            <td class="fixed">Fixed</td>
+            <td>Session was lost on app restart.</td>
+            <td>Session persistence implemented with Keychain.</td>
+            <td>Fewer forced re-logins, smoother officer workflow, better field usability.</td>
+            <td><code>src/App.tsx</code>, <code>src/services/authService.ts</code></td>
+          </tr>
+          <tr>
+            <td>C4</td>
+            <td class="fixed">Fixed</td>
+            <td>API host fallback was hardcoded.</td>
+            <td><code>API_BASE_URL</code> is mandatory in real-API mode.</td>
+            <td>Safer env switching (dev/stage/prod), less accidental misrouting, better deployment control.</td>
+            <td><code>src/config/env.ts</code></td>
+          </tr>
+          <tr>
+            <td>H1</td>
+            <td class="fixed">Fixed</td>
+            <td>No photo evidence in violation submission.</td>
+            <td>Camera capture integrated; <code>photoBase64</code> added to payload.</td>
+            <td>Higher evidence quality, fewer manual follow-ups, more complete reports.</td>
+            <td><code>src/screens/ViolationFormScreen.tsx</code></td>
+          </tr>
+          <tr>
+            <td>H2</td>
+            <td class="fixed">Fixed</td>
+            <td>Unused native dependency increased surface area.</td>
+            <td>Removed <code>react-native-fs</code>.</td>
+            <td>Cleaner dependency graph, lower native complexity, better maintainability.</td>
+            <td><code>package.json</code>, <code>package-lock.json</code></td>
+          </tr>
+          <tr>
+            <td>H3</td>
+            <td class="fixed">Fixed</td>
+            <td>Failed visits retried too often, without caps/backoff.</td>
+            <td>Retry metadata + capped exponential backoff + permanent-error pause.</td>
+            <td>Lower battery/data usage, fewer retry storms, safer offline-to-online recovery.</td>
+            <td><code>src/services/syncService.ts</code>, <code>src/services/storage.ts</code>, <code>src/screens/PendingUploadsScreen.tsx</code></td>
+          </tr>
+          <tr>
+            <td>H4</td>
+            <td class="fixed">Fixed</td>
+            <td>Users had weak sync/action visibility.</td>
+            <td>Toast/Alert feedback added at key points.</td>
+            <td>Clear status feedback, reduced confusion, fewer duplicate user actions.</td>
+            <td><code>src/utils/notify.ts</code> + related flows</td>
+          </tr>
+          <tr>
+            <td>H5</td>
+            <td class="fixed">Fixed</td>
+            <td>Manual/string-based navigation flow.</td>
+            <td>React Navigation stack + drawer migration.</td>
+            <td>More reliable back behavior, fewer routing errors, easier feature extension.</td>
+            <td><code>src/App.tsx</code>, <code>src/navigation/AuthenticatedFlow.tsx</code></td>
+          </tr>
+          <tr>
+            <td>M2</td>
+            <td class="fixed">Fixed</td>
+            <td>Penalty data refetched too often.</td>
+            <td>TanStack Query caching added with stale/gc windows.</td>
+            <td>Faster repeat opens, fewer network calls, better performance under weak connectivity.</td>
+            <td><code>src/screens/ViolationFormScreen.tsx</code></td>
+          </tr>
+          <tr>
+            <td>M3</td>
+            <td class="fixed">Fixed</td>
+            <td>Area calculation path was not optimized.</td>
+            <td>Memoized parsed dimensions before applying area.</td>
+            <td>More deterministic form behavior with less repeated parsing work.</td>
+            <td><code>src/screens/ViolationFormScreen.tsx</code></td>
+          </tr>
+          <tr>
+            <td>M4</td>
+            <td class="fixed">Fixed</td>
+            <td>Gradle memory baseline was too low (<code>Xmx1024m</code>).</td>
+            <td>Restored to CI-safe baseline (<code>Xmx2048m</code>).</td>
+            <td>More reliable Android build performance and fewer memory-related build failures.</td>
+            <td><code>android/gradle.properties</code></td>
+          </tr>
+          <tr>
+            <td>M5</td>
+            <td class="fixed">Fixed</td>
+            <td><code>edgeToEdgeEnabled=false</code> for newer Android behavior.</td>
+            <td>Edge-to-edge enabled for Android 15+ compatibility.</td>
+            <td>Reduced risk of system-bar/layout regressions on new Android versions.</td>
+            <td><code>android/gradle.properties</code></td>
+          </tr>
+          <tr>
+            <td>L1</td>
+            <td class="fixed">Fixed</td>
+            <td>Only a single smoke test existed.</td>
+            <td>Added focused UI tests for summary and site visit flows.</td>
+            <td>Higher regression safety, safer refactors, better release confidence.</td>
+            <td><code>__tests__/SummaryScreen.test.tsx</code>, <code>__tests__/SiteVisitScreen.test.tsx</code></td>
+          </tr>
+          <tr>
+            <td>L2</td>
+            <td class="fixed">Fixed</td>
+            <td>No deep-link support.</td>
+            <td>Added linking config and URL mappings.</td>
+            <td>Direct screen entry from URL/notifications and better integration readiness.</td>
+            <td><code>App.tsx</code>, <code>src/navigation/linking.ts</code></td>
+          </tr>
+          <tr>
+            <td>L3</td>
+            <td class="fixed">Fixed</td>
+            <td>Service errors were only logged via <code>console.warn</code>.</td>
+            <td>Service error reporting routed to Sentry helper.</td>
+            <td>Production error visibility, faster diagnosis, better operational monitoring.</td>
+            <td><code>src/services/errorReporting.ts</code> + service calls</td>
+          </tr>
+          <tr>
+            <td>L4</td>
+            <td class="fixed">Fixed</td>
+            <td>README was default template.</td>
+            <td>Project-specific setup/build/test docs added.</td>
+            <td>Lower onboarding friction, faster setup, fewer environment mistakes.</td>
+            <td><code>README.md</code></td>
+          </tr>
+          <tr>
+            <td>M1</td>
+            <td class="partial">Partially Fixed</td>
+            <td>TS configured but not used across core paths.</td>
+            <td>Navigation and core services migrated to TS.</td>
+            <td>Type safety in API/storage/sync critical paths; remaining JS still limits full app-wide typing.</td>
+            <td><code>src/navigation/*.ts</code>, <code>src/services/*.ts</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

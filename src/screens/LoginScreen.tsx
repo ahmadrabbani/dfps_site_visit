@@ -20,27 +20,32 @@ import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Button, Chip, HelperText, Surface, TextInput, useTheme} from 'react-native-paper';
 import {USE_FAKE_API} from '../config/env';
-import {login as loginRequest} from '../services/api';
+import {login as loginRequest, type SessionUser} from '../services/api';
+import {notifyError, notifySuccess} from '../utils/notify';
 
 const backgroundImage = require('../../LDABackground.jpg');
 const logoImage = require('../../LDA-logo.png');
 
 const loginSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(1, {message: 'Enter your username'}),
+  username: z.string().trim().min(1, {message: 'Enter your username'}),
   password: z.string().min(1, {message: 'Enter your password'}),
 });
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 const INPUT_RADIUS = 14;
 const BUTTON_RADIUS = 14;
 const CARD_RADIUS = 20;
 
 /** Avoid `Animated` native timers firing after Jest tears down the tree. */
-const SKIP_LOGIN_ANIMATIONS = process.env.NODE_ENV === 'test';
+const SKIP_LOGIN_ANIMATIONS =
+  (globalThis as {process?: {env?: {NODE_ENV?: string}}})?.process?.env?.NODE_ENV === 'test';
 
-export default function LoginScreen({onLogin}) {
+interface LoginScreenProps {
+  onLogin: (user: SessionUser) => void;
+}
+
+export default function LoginScreen({onLogin}: LoginScreenProps) {
   const theme = useTheme();
   const inputTheme = useMemo(
     () => ({
@@ -67,7 +72,7 @@ export default function LoginScreen({onLogin}) {
     setError,
     clearErrors,
     watch,
-  } = useForm({
+  } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {username: '', password: ''},
     mode: 'onSubmit',
@@ -134,14 +139,16 @@ export default function LoginScreen({onLogin}) {
     }
   }, [submitting]);
 
-  const onValidSubmit = async ({username, password}) => {
+  const onValidSubmit = async ({username, password}: LoginFormValues) => {
     clearErrors('root');
     setSubmitting(true);
     try {
       const user = await loginRequest(username.trim(), password);
+      notifySuccess(`Welcome, ${user.name || 'Officer'}.`);
       onLogin(user);
     } catch (err) {
-      const msg = err.message || 'Login failed';
+      const msg = (err as Error)?.message || 'Login failed';
+      notifyError(msg);
       setError('root', {type: 'server', message: msg});
     } finally {
       setSubmitting(false);
@@ -150,8 +157,7 @@ export default function LoginScreen({onLogin}) {
 
   const usernameValue = watch('username');
   const passwordValue = watch('password');
-  const canSubmit =
-    String(usernameValue || '').trim().length > 0 && String(passwordValue || '').length > 0;
+  const canSubmit = String(usernameValue || '').trim().length > 0 && String(passwordValue || '').length > 0;
 
   return (
     <View style={styles.root} accessibilityLabel="Login screen">
@@ -160,7 +166,7 @@ export default function LoginScreen({onLogin}) {
           <View style={styles.loginOverlayCard}>
             <ActivityIndicator size="large" color="#003366" />
             <Text style={styles.loginOverlayTitle}>Logging in</Text>
-            <Text style={styles.loginOverlaySubtitle}>Please wait…</Text>
+            <Text style={styles.loginOverlaySubtitle}>Please wait...</Text>
           </View>
         </View>
       </Modal>
@@ -233,7 +239,7 @@ export default function LoginScreen({onLogin}) {
                     style={styles.testChip}
                     textStyle={styles.testChipText}
                     accessibilityLabel="Test mode is on. The real API is not used.">
-                    Test mode — any username and password work
+                    Test mode - any username and password work
                   </Chip>
                 ) : null}
 

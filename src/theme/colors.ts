@@ -9,3 +9,5 @@ export const colors = {
   danger: '#b91c1c',
   success: '#15803d',
 };
+
+export type AppColors = typeof colors;

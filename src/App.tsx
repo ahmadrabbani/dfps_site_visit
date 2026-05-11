@@ -3,8 +3,11 @@ import {View, StatusBar, LogBox, ActivityIndicator, Text, StyleSheet} from 'reac
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import LoginScreen from './screens/LoginScreen';
 import AuthenticatedFlow from './navigation/AuthenticatedFlow';
+import {ROOT_ROUTES} from './navigation/routeNames';
 import {startSyncWatcher, stopSyncWatcher} from './services/syncService';
 import {clearSession, loadSession, saveSession} from './services/authService';
+import type {SessionUser} from './services/api';
+import type {SiteScope, ViolationDraft} from './types/app';
 
 LogBox.ignoreLogs([/SafeAreaView has been deprecated/]);
 
@@ -15,16 +18,16 @@ function SplashScreen() {
     <View style={splashStyles.container}>
       <StatusBar barStyle="dark-content" />
       <ActivityIndicator size="large" color="#003366" accessibilityLabel="Loading session" />
-      <Text style={splashStyles.text}>Loading…</Text>
+      <Text style={splashStyles.text}>Loading...</Text>
     </View>
   );
 }
 
 export default function App() {
   const [authReady, setAuthReady] = useState(false);
-  const [user, setUser] = useState(null);
-  const [siteScope, setSiteScope] = useState('residential');
-  const violationDraftRef = useRef(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
+  const [siteScope, setSiteScope] = useState<SiteScope>('residential');
+  const violationDraftRef = useRef<ViolationDraft | null>(null);
 
   useEffect(() => {
     startSyncWatcher();
@@ -59,11 +62,11 @@ export default function App() {
     };
   }, []);
 
-  const handleLogin = useCallback(async u => {
+  const handleLogin = useCallback(async (u: SessionUser) => {
     try {
       await saveSession(u);
-    } catch (e) {
-      console.warn('[App] saveSession failed', e?.message);
+    } catch {
+      // Keep login success even if local secure persistence fails.
     }
     setUser(u);
   }, []);
@@ -78,26 +81,26 @@ export default function App() {
 
   return (
     <Stack.Navigator key={stackKey} screenOptions={{headerShown: false, animation: 'slide_from_right'}}>
-        {!authReady ? (
-          <Stack.Screen name="Splash" component={SplashScreen} />
-        ) : !user ? (
-          <Stack.Screen name="Login" options={{contentStyle: {flex: 1}}}>
-            {() => <LoginScreen onLogin={handleLogin} />}
-          </Stack.Screen>
-        ) : (
-          <Stack.Screen name="Authenticated" options={{headerShown: false}}>
-            {() => (
-              <AuthenticatedFlow
-                user={user}
-                siteScope={siteScope}
-                setSiteScope={setSiteScope}
-                violationDraftRef={violationDraftRef}
-                onSignOut={handleSignOut}
-              />
-            )}
-          </Stack.Screen>
-        )}
-      </Stack.Navigator>
+      {!authReady ? (
+        <Stack.Screen name={ROOT_ROUTES.Splash} component={SplashScreen} />
+      ) : !user ? (
+        <Stack.Screen name={ROOT_ROUTES.Login} options={{contentStyle: {flex: 1}}}>
+          {() => <LoginScreen onLogin={handleLogin} />}
+        </Stack.Screen>
+      ) : (
+        <Stack.Screen name={ROOT_ROUTES.Authenticated} options={{headerShown: false}}>
+          {() => (
+            <AuthenticatedFlow
+              user={user}
+              siteScope={siteScope}
+              setSiteScope={setSiteScope}
+              violationDraftRef={violationDraftRef}
+              onSignOut={handleSignOut}
+            />
+          )}
+        </Stack.Screen>
+      )}
+    </Stack.Navigator>
   );
 }
 

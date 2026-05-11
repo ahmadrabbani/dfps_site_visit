@@ -3,11 +3,15 @@
  */
 
 import React from 'react';
-import ReactTestRenderer from 'react-test-renderer';
+import {render, screen, waitFor} from '@testing-library/react-native';
 import App from '../App';
 
-test('renders correctly', async () => {
-  await ReactTestRenderer.act(() => {
-    ReactTestRenderer.create(<App />);
+describe('App', () => {
+  test('renders login screen after bootstrap', async () => {
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Login screen')).toBeTruthy();
+    });
   });
 });

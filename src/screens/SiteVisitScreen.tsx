@@ -3,9 +3,19 @@ import {View, Text, TouchableOpacity, StyleSheet, FlatList} from 'react-native';
 import Geolocation from 'react-native-geolocation-service';
 import {USE_FAKE_API} from '../config/env';
 import {colors} from '../theme/colors';
+import type {SessionUser} from '../services/api';
+import type {SiteVisitViolation} from '../services/storage';
+import type {SetViolations, SiteScope} from '../types/app';
 
-/** Dev + fake API only: extra control without changing Geolocation logic below. */
 const showTestGpsControls = typeof __DEV__ !== 'undefined' && __DEV__ && USE_FAKE_API;
+
+interface SiteVisitScreenProps {
+  user: SessionUser;
+  siteScope: SiteScope;
+  onScopeChange: (scope: SiteScope) => void;
+  onAddViolation: (currentViolations: SiteVisitViolation[], setViolations: SetViolations) => void;
+  onCompleteVisit: (violations: SiteVisitViolation[], scopeAtVisit: SiteScope) => void;
+}
 
 export default function SiteVisitScreen({
   user,
@@ -13,10 +23,9 @@ export default function SiteVisitScreen({
   onScopeChange,
   onAddViolation,
   onCompleteVisit,
-}) {
-  const [deviceOnSite, setDeviceOnSite] = useState(false);
-  const [fakeOnSite, setFakeOnSite] = useState(false);
-  const [violations, setViolations] = useState([]);
+}: SiteVisitScreenProps) {
+  const [gpsAllowed, setGpsAllowed] = useState(false);
+  const [violations, setViolations] = useState<SiteVisitViolation[]>([]);
 
   // demo target location
   const targetLat = 31.5204;
@@ -27,14 +36,15 @@ export default function SiteVisitScreen({
       pos => {
         const {latitude, longitude} = pos.coords;
         const dist = distanceInMeters(latitude, longitude, targetLat, targetLon);
-        setDeviceOnSite(dist < 100);
+        setGpsAllowed(dist < 100);
       },
-      err => console.warn('GPS error', err),
+      () => {
+        // Keep existing behavior: failure means not verified on-site.
+        setGpsAllowed(false);
+      },
       {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
     );
   }, []);
-
-  const effectiveOnSite = deviceOnSite || fakeOnSite;
 
   const handleAddViolation = () => {
     onAddViolation(violations, setViolations);
@@ -44,7 +54,7 @@ export default function SiteVisitScreen({
     onCompleteVisit(violations, siteScope);
   };
 
-  const scopes = [
+  const scopes: Array<{label: string; value: SiteScope}> = [
     {label: 'Residential', value: 'residential'},
     {label: 'Commercial', value: 'commercial'},
   ];
@@ -54,28 +64,11 @@ export default function SiteVisitScreen({
       <Text style={styles.header}>Site Visit</Text>
       <Text style={styles.siteInfo}>Scheme / Block / Plot will be loaded per site</Text>
       <Text style={styles.siteInfo}>Officer: {user.name}</Text>
-      <View style={[styles.statusBadge, {backgroundColor: effectiveOnSite ? colors.success : colors.danger}]}>
-        <Text style={styles.statusText}>
-          {deviceOnSite
-            ? 'On-site (GPS verified)'
-            : fakeOnSite
-              ? 'On-site (test simulation)'
-              : 'Not at site location'}
-        </Text>
+      <View style={[styles.statusBadge, {backgroundColor: gpsAllowed ? colors.success : colors.danger}]}>
+        <Text style={styles.statusText}>{gpsAllowed ? 'On-site (GPS verified)' : 'Not at site location'}</Text>
       </View>
-
       {showTestGpsControls ? (
-        <TouchableOpacity
-          style={styles.testGpsBtn}
-          onPress={() => setFakeOnSite(v => !v)}
-          accessibilityRole="button"
-          accessibilityLabel={
-            fakeOnSite ? 'Turn off simulated on-site for testing' : 'Simulate on-site for testing'
-          }>
-          <Text style={styles.testGpsText}>
-            {fakeOnSite ? 'Test: use real GPS only' : 'Test: simulate on-site (near target)'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.siteInfo}>Test mode active (fake API enabled).</Text>
       ) : null}
 
       <View style={styles.scopeWrapper}>
@@ -110,7 +103,7 @@ export default function SiteVisitScreen({
 
       <FlatList
         data={violations}
-        keyExtractor={(item, idx) => idx.toString()}
+        keyExtractor={(_, idx) => idx.toString()}
         renderItem={({item}) => (
           <View style={styles.violationCard}>
             <Text style={styles.violationType}>{item.typeLabel || item.type}</Text>
@@ -133,9 +126,9 @@ export default function SiteVisitScreen({
       <TouchableOpacity
         style={[
           styles.completeButton,
-          effectiveOnSite && violations.length > 0 ? styles.completeButtonEnabled : styles.completeButtonDisabled,
+          gpsAllowed && violations.length > 0 ? styles.completeButtonEnabled : styles.completeButtonDisabled,
         ]}
-        disabled={!effectiveOnSite || violations.length === 0}
+        disabled={!gpsAllowed || violations.length === 0}
         onPress={handleComplete}>
         <Text style={styles.completeButtonText}>Complete Site Visit</Text>
       </TouchableOpacity>
@@ -143,17 +136,14 @@ export default function SiteVisitScreen({
   );
 }
 
-function distanceInMeters(lat1, lon1, lat2, lon2) {
+function distanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371000;
-  const toRad = d => (d * Math.PI) / 180;
+  const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
@@ -164,15 +154,6 @@ const styles = StyleSheet.create({
   siteInfo: {fontSize: 13, color: colors.mutedText, marginTop: 2},
   statusBadge: {marginTop: 12, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, alignSelf: 'flex-start'},
   statusText: {color: '#ffffff', fontSize: 12},
-  testGpsBtn: {
-    marginTop: 10,
-    alignSelf: 'stretch',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: colors.primaryLight,
-  },
-  testGpsText: {color: '#ffffff', fontSize: 12, fontWeight: '600', textAlign: 'center'},
   scopeWrapper: {marginTop: 16},
   scopeLabel: {fontSize: 13, color: colors.mutedText, marginBottom: 6},
   scopeButtons: {flexDirection: 'row'},

@@ -37,6 +37,9 @@ local.properties
 **/.cxx/
 *.keystore
 !debug.keystore
+# Android Play / upload signing (secrets + keys — never commit)
+android/keystore.properties
+android/keystores/
 .kotlin/
 # Android native build outputs (large; reproducible)
 android/.gradle/
