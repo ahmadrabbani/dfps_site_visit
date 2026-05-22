@@ -13,4 +13,5 @@ export const MAIN_STACK_ROUTES = {
   SiteVisit: 'SiteVisit',
   ViolationForm: 'ViolationForm',
   Summary: 'Summary',
+  MySubmissions: 'MySubmissions',
 } as const;

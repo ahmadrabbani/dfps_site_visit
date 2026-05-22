@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {reportServiceError} from './errorReporting';
 
 const PENDING_VISITS_KEY = 'PENDING_SITE_VISITS';
+const SUBMITTED_VISITS_KEY = 'SUBMITTED_CC_VISITS';
 
 export interface SiteVisitViolation {
   typeLabel?: string;
@@ -10,24 +11,40 @@ export interface SiteVisitViolation {
   violationCategoryId?: number | null;
   categoryLabel?: string | null;
   floorLabel?: string | null;
+  unit?: string;
   length?: number | null;
   width?: number | null;
   area?: number | null;
   notes?: string;
-  photoBase64?: string | null;
+  /** Local device URI — uploaded via conf_add_cc_form.php (portal). */
+  photoUri?: string | null;
 }
 
 export interface PendingVisitBase {
   localId: string;
   siteId: number;
+  caseId?: number | string;
+  caseNumber?: string;
+  isViolation?: boolean;
   officerId: number | string;
+  visitByName?: string;
   authToken: string;
   startTime: string;
   endTime: string;
   startLat: number;
   startLon: number;
   scope?: string;
+  remarks?: string;
+  noOfFloors?: number | string;
+  /** Local device URI — uploaded via conf_add_cc_form.php (portal). */
+  mainImageUri?: string | null;
   violations: SiteVisitViolation[];
+}
+
+export interface SubmittedVisitRecord extends PendingVisitBase {
+  uploadedAt: string;
+  serverMessage?: string;
+  remoteVisitId?: string;
 }
 
 export interface PendingVisit extends PendingVisitBase {
@@ -112,4 +129,35 @@ export async function resetAllPendingVisitRetries(): Promise<void> {
     }),
   );
   await AsyncStorage.setItem(PENDING_VISITS_KEY, JSON.stringify(reset));
+}
+
+export async function getSubmittedVisits(): Promise<SubmittedVisitRecord[]> {
+  try {
+    const raw = await AsyncStorage.getItem(SUBMITTED_VISITS_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed as SubmittedVisitRecord[];
+  } catch (e) {
+    reportServiceError('storage.getSubmittedVisits', e);
+    return [];
+  }
+}
+
+export async function addSubmittedVisit(
+  visit: PendingVisitBase,
+  meta?: {serverMessage?: string; remoteVisitId?: string},
+): Promise<void> {
+  const current = await getSubmittedVisits();
+  current.unshift({
+    ...visit,
+    uploadedAt: new Date().toISOString(),
+    serverMessage: meta?.serverMessage,
+    remoteVisitId: meta?.remoteVisitId,
+  });
+  await AsyncStorage.setItem(SUBMITTED_VISITS_KEY, JSON.stringify(current));
 }

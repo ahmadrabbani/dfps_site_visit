@@ -14,10 +14,12 @@ import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
 import SummaryScreen from '../screens/SummaryScreen';
+import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 import {addPendingVisit} from '../services/storage';
+import {syncPending} from '../services/syncService';
 import {notifySuccess} from '../utils/notify';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
-import type {AuthNavigationContextValue, SiteScope, ViolationDraft} from '../types/app';
+import type {AuthNavigationContextValue, CcSurveyCompletePayload, SiteScope, ViolationDraft} from '../types/app';
 import type {SessionUser} from '../services/api';
 
 const Drawer = createDrawerNavigator();
@@ -44,7 +46,13 @@ function AppDrawerContent(props: any) {
         }}
       />
       <DrawerItem
-        label="Sign out"
+        label="My submissions"
+        onPress={() => {
+          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.MySubmissions});
+          navigation.closeDrawer();
+        }}
+      />
+      <DrawerItem
         onPress={() => {
           navigation.closeDrawer();
           onSignOut();
@@ -87,23 +95,34 @@ function SiteVisitRouteScreen() {
           violationDraftRef.current = {currentViolations, setViolations};
           navigation.navigate(MAIN_STACK_ROUTES.ViolationForm);
         }}
-        onCompleteVisit={async (violations, scopeAtVisit) => {
+        onCompleteVisit={async (survey: CcSurveyCompletePayload) => {
           const now = new Date().toISOString();
-          const visitScope = scopeAtVisit || siteScope;
           const visit = {
             localId: 'local-' + Date.now(),
             siteId: 1,
+            caseId: survey.caseId,
+            caseNumber: survey.caseLabel,
             officerId: user.id,
+            visitByName: user.name,
             authToken: user.token,
             startTime: now,
             endTime: now,
-            startLat: 31.5204,
-            startLon: 74.3587,
-            scope: visitScope,
-            violations,
+            startLat: survey.coords.lat,
+            startLon: survey.coords.lng,
+            scope: survey.scope,
+            isViolation: survey.isViolation,
+            noOfFloors: survey.noOfFloors,
+            remarks: survey.remarks,
+            mainImageUri: survey.mainImageUri,
+            violations: survey.violations,
           };
           await addPendingVisit(visit);
-          notifySuccess('Site visit saved on device. It will sync when online.');
+          const syncResult = await syncPending();
+          if (syncResult.uploaded > 0) {
+            notifySuccess('Site visit uploaded to the server.');
+          } else {
+            notifySuccess('Site visit saved on device. It will sync when online.');
+          }
           navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit});
         }}
       />
@@ -137,6 +156,14 @@ function ViolationFormRouteScreen() {
   );
 }
 
+function MySubmissionsRouteScreen() {
+  return (
+    <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
+      <MySubmissionsScreen />
+    </SafeAreaView>
+  );
+}
+
 function SummaryRouteScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -165,6 +192,7 @@ function MainStack() {
       <Stack.Screen name={MAIN_STACK_ROUTES.SiteVisit} component={SiteVisitRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.ViolationForm} component={ViolationFormRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.Summary} component={SummaryRouteScreen} />
+      <Stack.Screen name={MAIN_STACK_ROUTES.MySubmissions} component={MySubmissionsRouteScreen} />
     </Stack.Navigator>
   );
 }

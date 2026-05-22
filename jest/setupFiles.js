@@ -63,6 +63,10 @@ jest.mock('react-native-fast-image', () => require('react-native').Image);
 jest.mock('react-native-config', () => ({
   default: {
     API_BASE_URL: '',
+    LOGIN_URL: 'http://test.example/login.php',
+    VIOLATION_LIST_URL: '',
+    CC_SURVEY_URL: '',
+    CC_APPLICATION_LIST_URL: '',
     USE_FAKE_API: 'false',
     SENTRY_DSN: '',
   },

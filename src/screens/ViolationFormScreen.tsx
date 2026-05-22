@@ -13,6 +13,7 @@ import {
 import {useQuery} from '@tanstack/react-query';
 import {launchCamera} from 'react-native-image-picker';
 import {colors} from '../theme/colors';
+import {CC_FLOOR_OPTIONS, CC_UNITS} from '../constants/ccSurvey';
 import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
 import {notifyInfo, notifySuccess} from '../utils/notify';
 import type {SiteVisitViolation} from '../services/storage';
@@ -37,8 +38,8 @@ export default function ViolationFormScreen({
   const [width, setWidth] = useState('');
   const [area, setArea] = useState('');
   const [notes, setNotes] = useState('');
-  const [floorLabel, setFloorLabel] = useState('');
-  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const [floorLabel, setFloorLabel] = useState<string>(CC_FLOOR_OPTIONS[2]);
+  const [unit, setUnit] = useState<string>(CC_UNITS[0].value);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [capturingPhoto, setCapturingPhoto] = useState(false);
   const scopes: Array<{label: string; value: SiteScope}> = [
@@ -76,12 +77,6 @@ export default function ViolationFormScreen({
     );
   }, [selectedType]);
 
-  useEffect(() => {
-    if (selectedCategory) {
-      setFloorLabel(selectedCategory.name);
-    }
-  }, [selectedCategory]);
-
   const handleSelectType = (typeOption: PenaltyType) => {
     setSelectedType(typeOption);
     if (typeOption.categories.length > 0) {
@@ -113,26 +108,38 @@ export default function ViolationFormScreen({
     notifyInfo('Enter valid length and width first.');
   }, [calculatedArea]);
 
+  const showCategoryTable =
+    !!selectedType &&
+    selectedType.categories.some(cat => cat.penaltyRate != null || cat.tokenFee != null);
+
   const handleSave = () => {
-    if (!selectedType || !selectedCategory) {
+    if (!selectedType) {
+      Alert.alert('Select violation', 'Please choose a violation type.');
+      return;
+    }
+    const category =
+      selectedCategory ||
+      (selectedType.categories.length === 1 ? selectedType.categories[0] : null);
+    if (!category) {
       Alert.alert('Select violation', 'Please choose a violation type and category.');
       return;
     }
-    if (!selectedCategory.isFixedAmount && !area) {
+    if (!category.isFixedAmount && !area) {
       Alert.alert('Area required', 'Enter an area or calculate it for this violation.');
       return;
     }
     const v: SiteVisitViolation = {
       violationTypeId: selectedType.id,
-      violationCategoryId: selectedCategory.id,
+      violationCategoryId: category.id,
       typeLabel: selectedType.name,
-      categoryLabel: selectedCategory.name,
-      floorLabel: floorLabel || selectedCategory.name,
+      categoryLabel: category.name,
+      floorLabel,
+      unit,
       length: length ? parseFloat(length) : null,
       width: width ? parseFloat(width) : null,
       area: area ? parseFloat(area) : null,
       notes,
-      photoBase64,
+      photoUri,
     };
     notifySuccess('Violation added to this visit.');
     onSave(v);
@@ -143,7 +150,7 @@ export default function ViolationFormScreen({
     try {
       const result = await launchCamera({
         mediaType: 'photo',
-        includeBase64: true,
+        includeBase64: false,
         saveToPhotos: false,
         quality: 0.7,
         maxWidth: 1280,
@@ -162,13 +169,12 @@ export default function ViolationFormScreen({
       }
 
       const asset = result.assets?.[0];
-      if (!asset?.base64) {
+      if (!asset?.uri) {
         Alert.alert('Photo missing', 'Photo was captured, but image data is unavailable.');
         return;
       }
 
-      setPhotoBase64(asset.base64);
-      setPhotoUri(asset.uri || null);
+      setPhotoUri(asset.uri);
       notifySuccess('Photo attached to this violation.');
     } finally {
       setCapturingPhoto(false);
@@ -239,7 +245,7 @@ export default function ViolationFormScreen({
             ))}
           </View>
 
-          {selectedType && selectedType.categories.length > 0 ? (
+          {selectedType && showCategoryTable ? (
             <View style={styles.table}>
               <View style={[styles.tableRow, styles.tableHeader]}>
                 <Text style={[styles.tableCell, styles.cellCategory]}>Category</Text>
@@ -267,18 +273,38 @@ export default function ViolationFormScreen({
         </>
       )}
 
-      <Text style={styles.label}>Floor / Custom Label</Text>
-      <TextInput
-        style={styles.input}
-        value={floorLabel}
-        onChangeText={setFloorLabel}
-        placeholder="e.g. Ground Floor"
-      />
+      <Text style={styles.label}>Floor *</Text>
+      <View style={styles.chipRow}>
+        {CC_FLOOR_OPTIONS.map(floor => (
+          <TouchableOpacity
+            key={floor}
+            style={[styles.chip, floorLabel === floor ? styles.chipActive : styles.chipInactive]}
+            onPress={() => setFloorLabel(floor)}>
+            <Text style={[styles.chipText, floorLabel === floor ? styles.chipTextActive : null]}>
+              {floor}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-      <Text style={styles.label}>Length (ft)</Text>
+      <Text style={styles.label}>Unit *</Text>
+      <View style={styles.chipRow}>
+        {CC_UNITS.map(option => (
+          <TouchableOpacity
+            key={option.value}
+            style={[styles.chip, unit === option.value ? styles.chipActive : styles.chipInactive]}
+            onPress={() => setUnit(option.value)}>
+            <Text style={[styles.chipText, unit === option.value ? styles.chipTextActive : null]}>
+              {option.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={styles.label}>Length</Text>
       <TextInput style={styles.input} keyboardType="numeric" value={length} onChangeText={setLength} />
 
-      <Text style={styles.label}>Width (ft)</Text>
+      <Text style={styles.label}>Width</Text>
       <TextInput style={styles.input} keyboardType="numeric" value={width} onChangeText={setWidth} />
 
       <TouchableOpacity style={styles.smallButton} onPress={handleCalculateArea}>
@@ -303,11 +329,11 @@ export default function ViolationFormScreen({
         onPress={handleCapturePhoto}
         disabled={capturingPhoto}>
         <Text style={styles.smallButtonText}>
-          {capturingPhoto ? 'Opening camera...' : photoBase64 ? 'Retake Photo' : 'Take Photo'}
+          {capturingPhoto ? 'Opening camera...' : photoUri ? 'Retake Photo' : 'Take Photo'}
         </Text>
       </TouchableOpacity>
-      {photoBase64 ? (
-        <Text style={styles.photoMeta}>Photo attached and will upload with this violation.</Text>
+      {photoUri ? (
+        <Text style={styles.photoMeta}>Photo will upload with the survey.</Text>
       ) : (
         <Text style={styles.photoMeta}>Optional: capture a photo for evidence.</Text>
       )}
@@ -376,4 +402,10 @@ const styles = StyleSheet.create({
   save: {backgroundColor: colors.primary, marginLeft: 8},
   actionText: {fontWeight: '600', color: colors.text},
   actionTextOnPrimary: {color: '#ffffff'},
+  chipRow: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 4},
+  chip: {paddingVertical: 6, paddingHorizontal: 10, borderRadius: 999, marginRight: 8, marginBottom: 8},
+  chipActive: {backgroundColor: colors.primary},
+  chipInactive: {backgroundColor: '#e5e7eb'},
+  chipText: {fontSize: 12, color: colors.text},
+  chipTextActive: {color: '#ffffff'},
 });

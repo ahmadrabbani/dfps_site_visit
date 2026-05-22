@@ -11,6 +11,7 @@ const TITLES: Record<string, string> = {
   [MAIN_STACK_ROUTES.SiteVisit]: 'Site visit',
   [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
   [MAIN_STACK_ROUTES.Summary]: 'Summary',
+  [MAIN_STACK_ROUTES.MySubmissions]: 'My submissions',
   PendingUploads: 'Pending uploads',
 };
 

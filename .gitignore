@@ -68,6 +68,9 @@ node_modules/.generated/
 # Local AI / editor (machine-specific; not for repo)
 .claude/settings.local.json
 
+# Reference PHP portal (managed separately; not part of the RN app)
+housingportal/
+
 # fastlane
 #
 # It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the

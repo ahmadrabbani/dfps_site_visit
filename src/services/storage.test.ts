@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   addPendingVisit,
+  addSubmittedVisit,
   clearPendingVisits,
   getPendingVisits,
+  getSubmittedVisits,
   markVisitUploaded,
   type PendingVisitBase,
 } from './storage';
@@ -56,5 +58,15 @@ describe('storage pending visits', () => {
     await clearPendingVisits();
     const visits = await getPendingVisits();
     expect(visits).toEqual([]);
+  });
+
+  test('stores submitted visit history', async () => {
+    await addSubmittedVisit(makeVisit('v-done'), {remoteVisitId: '501', serverMessage: 'OK'});
+
+    const submitted = await getSubmittedVisits();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0].localId).toBe('v-done');
+    expect(submitted[0].remoteVisitId).toBe('501');
+    expect(submitted[0].uploadedAt).toBeTruthy();
   });
 });

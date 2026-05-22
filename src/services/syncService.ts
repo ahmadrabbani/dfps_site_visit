@@ -5,6 +5,7 @@ import {
   markVisitUploaded,
   resetAllPendingVisitRetries,
   updatePendingVisit,
+  addSubmittedVisit,
 } from './storage';
 import {pushSiteVisit} from './api';
 import {reportServiceError} from './errorReporting';
@@ -98,7 +99,8 @@ export async function syncPending(): Promise<SyncPendingResult> {
     }
 
     try {
-      await pushSiteVisit(v);
+      const result = (await pushSiteVisit(v)) as {serverMessage?: string};
+      await addSubmittedVisit(v, {serverMessage: result.serverMessage});
       await markVisitUploaded(v.localId);
       uploaded += 1;
     } catch (e) {

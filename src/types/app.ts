@@ -4,6 +4,20 @@ import type {SiteVisitViolation} from '../services/storage';
 
 export type SiteScope = 'residential' | 'commercial';
 
+export type ViolationChoice = 'yes' | 'no' | '';
+
+export interface CcSurveyCompletePayload {
+  caseId: string;
+  caseLabel: string;
+  isViolation: boolean;
+  noOfFloors: number;
+  remarks: string;
+  mainImageUri: string | null;
+  violations: SiteVisitViolation[];
+  scope: SiteScope;
+  coords: {lat: number; lng: number};
+}
+
 export type SetViolations = Dispatch<SetStateAction<SiteVisitViolation[]>>;
 
 export interface ViolationDraft {

@@ -15,8 +15,10 @@ export async function saveSession(user: SessionUser): Promise<boolean> {
   }
   const payload = JSON.stringify({
     id: user.id,
+    username: user.username ?? user.name,
     name: user.name ?? 'Officer',
     token: user.token,
+    portalCookie: user.portalCookie ?? null,
   });
   const result = await Keychain.setGenericPassword('session', payload, {
     service: KEYCHAIN_SERVICE,
@@ -42,12 +44,35 @@ export async function loadSession(): Promise<SessionUser | null> {
     }
     return {
       id: data.id,
+      username: data.username ?? data.name ?? 'Officer',
       name: data.name ?? 'Officer',
       token: data.token,
+      portalCookie: data.portalCookie ?? null,
     };
   } catch {
     return null;
   }
+}
+
+export async function getPortalSessionCookie(): Promise<string | null> {
+  const creds = await Keychain.getGenericPassword({service: KEYCHAIN_SERVICE});
+  if (!creds || !('password' in creds) || !creds.password) {
+    return null;
+  }
+  try {
+    const data = JSON.parse(creds.password) as {portalCookie?: string | null};
+    return data.portalCookie?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function savePortalSessionCookie(cookie: string | null): Promise<void> {
+  const user = await loadSession();
+  if (!user) {
+    return;
+  }
+  await saveSession({...user, portalCookie: cookie});
 }
 
 export async function clearSession(): Promise<void> {

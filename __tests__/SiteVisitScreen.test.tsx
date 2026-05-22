@@ -1,15 +1,41 @@
 import React from 'react';
+import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react-native';
 import SiteVisitScreen from '../src/screens/SiteVisitScreen';
+import {fetchCaseList} from '../src/services/api';
 import type {SiteVisitViolation} from '../src/services/storage';
 
+jest.mock('../src/services/api', () => {
+  const actual = jest.requireActual('../src/services/api');
+  return {
+    ...actual,
+    fetchCaseList: jest.fn(),
+  };
+});
+
+const mockFetchCaseList = fetchCaseList as jest.MockedFunction<typeof fetchCaseList>;
+
+function renderWithQuery(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: {queries: {retry: false}},
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
+
 describe('SiteVisitScreen', () => {
-  test('adds a violation via callback and enables complete action', async () => {
+  beforeEach(() => {
+    mockFetchCaseList.mockResolvedValue([
+      {id: '101', owc: 'Case-101 / Plot A'},
+      {id: '102', owc: 'Case-102 / Plot B'},
+    ]);
+  });
+
+  test('completes CC survey when case, violation, and floors are filled', async () => {
     const onCompleteVisit = jest.fn();
 
-    render(
+    renderWithQuery(
       <SiteVisitScreen
-        user={{id: 1, name: 'Officer A', token: 'token-a'}}
+        user={{id: 1, username: 'officer.a', name: 'Officer A', token: 'token-a'}}
         siteScope="residential"
         onScopeChange={jest.fn()}
         onCompleteVisit={onCompleteVisit}
@@ -20,20 +46,54 @@ describe('SiteVisitScreen', () => {
           setViolations([
             ...currentViolations,
             {
+              violationTypeId: 30,
               typeLabel: 'Illegal extension',
-              area: 100,
+              floorLabel: 'GF',
+              unit: 'sqft',
+              width: 10,
+              length: 12,
             },
           ])
         }
       />,
     );
 
+    await waitFor(() => {
+      expect(screen.getByText('Case-101 / Plot A')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Case-101 / Plot A'));
+    fireEvent.press(screen.getByText('Yes'));
     fireEvent.press(screen.getByText('+ Add Violation'));
+
     await waitFor(() => {
       expect(screen.getByText('Illegal extension')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Complete Site Visit'));
-    expect(onCompleteVisit).toHaveBeenCalledTimes(1);
+    fireEvent.changeText(screen.getByPlaceholderText('Max 50'), '3');
+
+    await waitFor(() => {
+      expect(screen.getByText('Save Survey')).not.toBeDisabled();
+    });
+
+    fireEvent.press(screen.getByText('Save Survey'));
+
+    await waitFor(() => {
+      expect(onCompleteVisit).toHaveBeenCalledTimes(1);
+    });
+
+    expect(onCompleteVisit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: '101',
+        caseLabel: 'Case-101 / Plot A',
+        isViolation: true,
+        noOfFloors: 3,
+        scope: 'residential',
+        coords: {lat: 31.5204, lng: 74.3587},
+        violations: expect.arrayContaining([
+          expect.objectContaining({typeLabel: 'Illegal extension', floorLabel: 'GF', unit: 'sqft'}),
+        ]),
+      }),
+    );
   });
 });
