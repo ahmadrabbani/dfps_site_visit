@@ -87,6 +87,8 @@ export interface PenaltyType {
 export interface CcCaseItem {
   id: string;
   owc: string;
+  plot_category?: string;
+  category?: string;
 }
 
 interface CcViolationListItem {
@@ -94,8 +96,23 @@ interface CcViolationListItem {
   vtype: string;
 }
 
-function scopeToViolationCategory(scope: string): 'Commercial' | 'Residential' {
+export function scopeToSurveyCategory(scope: string): 'Commercial' | 'Residential' {
   return scope.toLowerCase() === 'commercial' ? 'Commercial' : 'Residential';
+}
+
+function scopeToViolationCategory(scope: string): 'Commercial' | 'Residential' {
+  return scopeToSurveyCategory(scope);
+}
+
+function filterCasesForScope(items: CcCaseItem[], scope: string): CcCaseItem[] {
+  const want = scopeToSurveyCategory(scope).toLowerCase();
+  return items.filter(item => {
+    const raw = String(item.plot_category ?? item.category ?? '').trim().toLowerCase();
+    if (!raw) {
+      return true;
+    }
+    return raw.includes(want);
+  });
 }
 
 /** Maps cc_violation_list.php rows into the shape used by ViolationFormScreen. */
@@ -258,13 +275,25 @@ function parseSurveyListError(payload: unknown): string | null {
 }
 
 /** Loads cases for CC survey (cc_application_list.php). */
-export async function fetchCaseList(officerName: string): Promise<CcCaseItem[]> {
+export async function fetchCaseList(
+  officerName: string,
+  scope: string = 'residential',
+): Promise<CcCaseItem[]> {
   const baseUrl = getCcApplicationListUrl();
   const userParam = encodeUserParam(officerName);
-  const url = userParam
-    ? appendSurveyApiQuery(baseUrl, {u: userParam})
-    : appendSurveyApiQuery(baseUrl, {});
-  const res = await fetch(url);
+  const category = scopeToSurveyCategory(scope);
+  const params: Record<string, string> = {category};
+  if (userParam) {
+    params.u = userParam;
+  }
+  const url = appendSurveyApiQuery(baseUrl, params);
+
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch {
+    throw new Error('Cannot reach case list server. Check internet connection.');
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to load cases: ${text}`);
@@ -278,7 +307,9 @@ export async function fetchCaseList(officerName: string): Promise<CcCaseItem[]> 
   if (!Array.isArray(payload)) {
     throw new Error('Failed to load cases');
   }
-  return payload.filter(item => item?.id && item?.owc);
+  const rows = payload.filter(item => item?.id && item?.owc);
+  const filtered = filterCasesForScope(rows, scope);
+  return filtered.length > 0 ? filtered : rows;
 }
 
 export async function fetchViolationTypes(scope = 'residential'): Promise<PenaltyType[]> {

@@ -135,16 +135,24 @@ export default function SiteVisitScreen({
     };
   }, [refreshGps]);
 
+  const plotCategoryLabel = siteScope === 'commercial' ? 'Commercial' : 'Residential';
+
   const {
     data: cases = [],
     isLoading: casesLoading,
+    isFetching: casesFetching,
     error: casesError,
     refetch: refetchCases,
   } = useQuery({
-    queryKey: ['ccCases', user.username],
-    queryFn: () => fetchCaseList(user.username),
-    staleTime: 5 * 60 * 1000,
+    queryKey: ['ccCases', user.username, siteScope],
+    queryFn: () => fetchCaseList(user.username, siteScope),
+    staleTime: 2 * 60 * 1000,
   });
+
+  const handleScopeChange = (scope: SiteScope) => {
+    setSelectedCaseId('');
+    onScopeChange(scope);
+  };
 
   const selectedCase = useMemo(
     () => cases.find(item => item.id === selectedCaseId) || null,
@@ -158,10 +166,17 @@ export default function SiteVisitScreen({
   const showNoViolationSection = caseAndCategoryReady && isNoViolation;
 
   useEffect(() => {
+    setSelectedCaseId('');
     setViolations([]);
     setRemarks('');
     setSiteSketchUri(null);
-  }, [selectedCaseId, violationChoice, siteScope]);
+  }, [siteScope]);
+
+  useEffect(() => {
+    setViolations([]);
+    setRemarks('');
+    setSiteSketchUri(null);
+  }, [selectedCaseId, violationChoice]);
 
   const scopes: Array<{label: string; value: SiteScope}> = [
     {label: 'Residential', value: 'residential'},
@@ -333,7 +348,7 @@ export default function SiteVisitScreen({
               styles.chip,
               scope.value === siteScope ? styles.chipActive : styles.chipInactive,
             ]}
-            onPress={() => onScopeChange(scope.value)}>
+            onPress={() => handleScopeChange(scope.value)}>
             <Text style={[styles.chipText, scope.value === siteScope ? styles.chipTextActive : null]}>
               {scope.label}
             </Text>
@@ -342,10 +357,11 @@ export default function SiteVisitScreen({
       </View>
 
       <Text style={styles.label}>Select Case *</Text>
-      {casesLoading ? (
+      <Text style={styles.helper}>Cases for {plotCategoryLabel} plot category</Text>
+      {casesLoading || casesFetching ? (
         <View style={styles.loaderRow}>
           <ActivityIndicator color={colors.primary} />
-          <Text style={styles.helper}>Loading cases...</Text>
+          <Text style={styles.helper}>Loading {plotCategoryLabel} cases...</Text>
         </View>
       ) : casesError ? (
         <View>
@@ -357,7 +373,10 @@ export default function SiteVisitScreen({
       ) : (
         <View>
           {cases.length === 0 ? (
-            <Text style={styles.helper}>No cases available for your account.</Text>
+            <Text style={styles.helper}>
+              No {plotCategoryLabel} cases for {user.username}. Try the other plot category or sign in with
+              your field officer account.
+            </Text>
           ) : (
             cases.map(item => (
               <TouchableOpacity
