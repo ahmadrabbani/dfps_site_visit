@@ -1,14 +1,17 @@
 import React from 'react';
-import {View, Text, TouchableOpacity, StyleSheet, FlatList} from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, ScrollView} from 'react-native';
+import {formatForwardCcSurveyPreview} from '../services/ccSurveySubmit';
 import {colors} from '../theme/colors';
 import type {PendingVisit} from '../services/storage';
 
 interface SummaryScreenProps {
   visit?: PendingVisit | null;
+  uploadedToApi?: boolean;
+  uploadError?: string | null;
   onDone: () => void;
 }
 
-export default function SummaryScreen({visit, onDone}: SummaryScreenProps) {
+export default function SummaryScreen({visit, uploadedToApi, uploadError, onDone}: SummaryScreenProps) {
   if (!visit) {
     return (
       <View style={styles.container}>
@@ -20,43 +23,105 @@ export default function SummaryScreen({visit, onDone}: SummaryScreenProps) {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Site Visit Completed</Text>
-      <Text style={styles.sub}>Site ID: {visit.siteId}</Text>
-      <Text style={styles.sub}>Schedule: {visit.scope}</Text>
-      <Text style={styles.sub}>Violations recorded: {visit.violations.length}</Text>
+  const apiFields = formatForwardCcSurveyPreview(visit);
 
-      <FlatList
-        data={visit.violations}
-        keyExtractor={(_, idx) => idx.toString()}
-        renderItem={({item}) => (
-          <View style={styles.card}>
-            <Text style={styles.type}>{item.typeLabel || item.type}</Text>
-            {item.categoryLabel || item.floorLabel ? (
-              <Text style={styles.meta}>Category/Floor: {item.floorLabel || item.categoryLabel}</Text>
-            ) : null}
-            {item.area ? <Text style={styles.meta}>Area: {item.area} sq.ft</Text> : null}
-            {item.notes ? <Text style={styles.notes}>{item.notes}</Text> : null}
-          </View>
-        )}
-      />
+  return (
+    <ScrollView contentContainerStyle={styles.scroll}>
+      <Text style={styles.header}>Survey saved</Text>
+      <Text style={styles.sub}>
+        Case {visit.caseId} · {visit.isViolation ? 'Violation' : 'No violation'} · {visit.scope}
+      </Text>
+
+      {uploadedToApi ? (
+        <Text style={styles.bannerOk}>Pushed to forward_cc_survey.php</Text>
+      ) : (
+        <Text style={styles.bannerPending}>
+          Saved on device only. Open My Submissions → Push to API now.
+          {uploadError ? `\n${uploadError}` : ''}
+        </Text>
+      )}
+
+      <Text style={styles.sectionTitle}>API fields sent / queued</Text>
+      <View style={styles.apiBlock}>
+        {apiFields.map(line => (
+          <Text key={line} style={styles.apiLine}>
+            {line}
+          </Text>
+        ))}
+      </View>
+
+      {visit.violations.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>Violations ({visit.violations.length})</Text>
+          {visit.violations.map((item, idx) => (
+            <View key={idx} style={styles.card}>
+              <Text style={styles.type}>{item.typeLabel || item.type}</Text>
+              {item.floorLabel ? <Text style={styles.meta}>Floor: {item.floorLabel}</Text> : null}
+              {item.width != null && item.length != null ? (
+                <Text style={styles.meta}>
+                  {item.width} x {item.length} {item.unit}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+        </>
+      ) : null}
 
       <TouchableOpacity style={styles.button} onPress={onDone}>
         <Text style={styles.buttonText}>Back to Dashboard</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {flex: 1, padding: 16, backgroundColor: colors.background},
+  scroll: {padding: 16, paddingBottom: 32, backgroundColor: colors.background, flexGrow: 1},
   header: {fontSize: 20, fontWeight: '700', color: colors.primary},
-  sub: {fontSize: 13, color: colors.mutedText, marginTop: 4},
-  card: {backgroundColor: colors.card, borderRadius: 10, padding: 12, marginTop: 10, borderWidth: 1, borderColor: '#e5e7eb'},
+  sub: {fontSize: 13, color: colors.mutedText, marginTop: 4, marginBottom: 12},
+  bannerOk: {
+    fontSize: 13,
+    color: colors.success,
+    backgroundColor: '#ecfdf5',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  bannerPending: {
+    fontSize: 13,
+    color: '#92400e',
+    backgroundColor: '#fffbeb',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  sectionTitle: {fontSize: 14, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 6},
+  apiBlock: {
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 12,
+  },
+  apiLine: {fontSize: 11, color: colors.text, marginBottom: 3},
+  card: {
+    backgroundColor: colors.card,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
   type: {fontWeight: '600', color: colors.text},
   meta: {fontSize: 12, color: colors.mutedText, marginTop: 4},
-  notes: {fontSize: 12, color: colors.text, marginTop: 6},
-  button: {marginTop: 16, paddingVertical: 14, borderRadius: 12, backgroundColor: colors.primary, alignItems: 'center'},
+  button: {
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
   buttonText: {color: '#ffffff', fontWeight: '600'},
 });

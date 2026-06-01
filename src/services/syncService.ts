@@ -135,3 +135,38 @@ export async function retryFailedNow(): Promise<SyncPendingResult> {
   await resetAllPendingVisitRetries();
   return syncPending();
 }
+
+/** Push one saved visit immediately (e.g. from My Submissions). */
+export async function syncVisitById(localId: string): Promise<SyncPendingResult> {
+  const visits = await getPendingVisits();
+  const visit = visits.find(v => v.localId === localId);
+  if (!visit) {
+    return {uploaded: 0, failed: 0, deferred: 0, paused: 0};
+  }
+
+  if (visit.paused) {
+    await updatePendingVisit(localId, {paused: false, retryCount: 0, nextRetryAt: 0, lastError: ''});
+  }
+
+  const now = Date.now();
+  try {
+    const result = await pushSiteVisit(visit);
+    await addSubmittedVisit(visit, {serverMessage: result.serverMessage});
+    await markVisitUploaded(localId);
+    notifySyncSuccess(1);
+    return {uploaded: 1, failed: 0, deferred: 0, paused: 0};
+  } catch (e) {
+    reportServiceError('syncService.syncVisitById', e, {localId});
+    const permanent = isPermanentSyncError(e);
+    const nextRetryCount = (visit.retryCount || 0) + 1;
+    const shouldPause = permanent || nextRetryCount >= MAX_RETRIES;
+    await updatePendingVisit(localId, {
+      retryCount: nextRetryCount,
+      nextRetryAt: shouldPause ? 0 : now + computeRetryDelayMs(nextRetryCount),
+      paused: shouldPause,
+      lastError: String((e as {message?: string})?.message || 'Upload failed'),
+    });
+    notifySyncAllFailed(1);
+    return {uploaded: 0, failed: 1, deferred: 0, paused: shouldPause ? 1 : 0};
+  }
+}

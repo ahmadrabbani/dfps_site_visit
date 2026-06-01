@@ -35,10 +35,9 @@ describe('SummaryScreen', () => {
       <SummaryScreen onDone={jest.fn()} visit={visit} />,
     );
 
-    expect(screen.getByText('Site Visit Completed')).toBeTruthy();
-    expect(screen.getByText('Site ID: 77')).toBeTruthy();
-    expect(screen.getByText('Schedule: commercial')).toBeTruthy();
-    expect(screen.getByText('Violations recorded: 1')).toBeTruthy();
+    expect(screen.getByText('Survey saved')).toBeTruthy();
+    expect(screen.getByText('case_id: 77')).toBeTruthy();
+    expect(screen.getByText('plot_category: Commercial')).toBeTruthy();
     expect(screen.getByText('Encroachment')).toBeTruthy();
   });
 });

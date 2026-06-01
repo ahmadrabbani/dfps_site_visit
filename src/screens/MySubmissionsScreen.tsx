@@ -9,15 +9,16 @@ import {
   ScrollView,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
+import {formatForwardCcSurveyPreview} from '../services/ccSurveySubmit';
 import {
   getPendingVisits,
   getSubmittedVisits,
   type PendingVisit,
   type SubmittedVisitRecord,
 } from '../services/storage';
-import {retryFailedNow, syncPending} from '../services/syncService';
+import {retryFailedNow, syncPending, syncVisitById} from '../services/syncService';
 import {colors} from '../theme/colors';
-import {notifyInfo} from '../utils/notify';
+import {notifyInfo, notifySuccess} from '../utils/notify';
 
 function formatDate(iso?: string) {
   if (!iso) {
@@ -31,16 +32,24 @@ function SubmissionCard({
   title,
   subtitle,
   meta,
+  apiFields,
   status,
   statusTone,
   imageUri,
+  actionLabel,
+  onAction,
+  actionDisabled,
 }: {
   title: string;
   subtitle: string;
   meta: string[];
+  apiFields?: string[];
   status: string;
   statusTone: 'success' | 'warning' | 'muted';
   imageUri?: string | null;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionDisabled?: boolean;
 }) {
   const statusColor =
     statusTone === 'success' ? colors.success : statusTone === 'warning' ? colors.danger : colors.mutedText;
@@ -57,7 +66,25 @@ function SubmissionCard({
           {line}
         </Text>
       ))}
+      {apiFields && apiFields.length > 0 ? (
+        <View style={styles.apiBlock}>
+          <Text style={styles.apiTitle}>API payload (forward_cc_survey.php)</Text>
+          {apiFields.map(line => (
+            <Text key={line} style={styles.apiLine}>
+              {line}
+            </Text>
+          ))}
+        </View>
+      ) : null}
       {imageUri ? <Image source={{uri: imageUri}} style={styles.thumbnail} /> : null}
+      {actionLabel && onAction ? (
+        <TouchableOpacity
+          style={[styles.cardAction, actionDisabled ? styles.btnDisabled : null]}
+          disabled={actionDisabled}
+          onPress={onAction}>
+          <Text style={styles.cardActionText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -67,6 +94,7 @@ export default function MySubmissionsScreen() {
   const [pending, setPending] = useState<PendingVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [pushingId, setPushingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -85,12 +113,14 @@ export default function MySubmissionsScreen() {
     }, [refresh]),
   );
 
-  const handleSync = async () => {
+  const handleSyncAll = async () => {
     setSyncing(true);
     try {
       const result = await syncPending();
       if (result.uploaded === 0 && result.failed === 0 && result.deferred === 0 && result.paused === 0) {
-        notifyInfo('Nothing to sync right now.');
+        notifyInfo('Nothing waiting to push.');
+      } else if (result.uploaded > 0) {
+        notifySuccess(`${result.uploaded} survey(s) sent to the API.`);
       }
       await refresh();
     } finally {
@@ -98,13 +128,29 @@ export default function MySubmissionsScreen() {
     }
   };
 
-  const handleRetry = async () => {
+  const handleRetryAll = async () => {
     setSyncing(true);
     try {
-      await retryFailedNow();
+      const result = await retryFailedNow();
+      if (result.uploaded > 0) {
+        notifySuccess(`${result.uploaded} survey(s) sent to the API.`);
+      }
       await refresh();
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handlePushOne = async (localId: string) => {
+    setPushingId(localId);
+    try {
+      const result = await syncVisitById(localId);
+      if (result.uploaded > 0) {
+        notifySuccess('Survey pushed to the API.');
+      }
+      await refresh();
+    } finally {
+      setPushingId(null);
     }
   };
 
@@ -120,27 +166,27 @@ export default function MySubmissionsScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>My Submissions</Text>
       <Text style={styles.lead}>
-        Surveys submitted from this app replace the web portal. Uploads go to the housing portal
-        (conf_add_cc_form.php), which saves the visit and forwards to the survey API.
+        Surveys are saved on this device, then POSTed to forward_cc_survey.php with: case_id, is_violation,
+        visit_by, visit_by_name, remarks, lat, lng, main_image, no_of_floors, plot_category.
       </Text>
 
       <View style={styles.actions}>
         <TouchableOpacity
           style={[styles.primaryBtn, syncing && styles.btnDisabled]}
           disabled={syncing}
-          onPress={handleSync}>
+          onPress={handleSyncAll}>
           {syncing ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.primaryBtnText}>Sync pending</Text>
+            <Text style={styles.primaryBtnText}>Push all pending to API</Text>
           )}
         </TouchableOpacity>
         {pending.some(v => v.paused || (v.retryCount || 0) > 0) ? (
           <TouchableOpacity
             style={[styles.secondaryBtn, syncing && styles.btnDisabled]}
             disabled={syncing}
-            onPress={handleRetry}>
-            <Text style={styles.secondaryBtnText}>Retry failed</Text>
+            onPress={handleRetryAll}>
+            <Text style={styles.secondaryBtnText}>Retry failed uploads</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -155,22 +201,20 @@ export default function MySubmissionsScreen() {
             title={item.caseNumber || `Case ${item.caseId}`}
             subtitle={`${item.scope || 'Survey'} · ${item.isViolation ? 'Violation' : 'No violation'}`}
             meta={[
-              `Submitted: ${formatDate(item.uploadedAt)}`,
-              `Floors: ${item.noOfFloors ?? '-'}`,
-              `Violations: ${item.violations?.length ?? 0}`,
-              item.remarks ? `Remarks: ${item.remarks}` : '',
-              item.remoteVisitId ? `Server ID: ${item.remoteVisitId}` : '',
+              `Pushed: ${formatDate(item.uploadedAt)}`,
+              item.serverMessage ? `Server: ${item.serverMessage}` : '',
             ].filter(Boolean)}
-            status="Uploaded"
+            apiFields={formatForwardCcSurveyPreview(item)}
+            status="On server"
             statusTone="success"
             imageUri={item.mainImageUri}
           />
         ))
       )}
 
-      <Text style={styles.sectionTitle}>Pending sync ({pending.length})</Text>
+      <Text style={styles.sectionTitle}>Saved on device — not pushed yet ({pending.length})</Text>
       {pending.length === 0 ? (
-        <Text style={styles.empty}>No pending uploads.</Text>
+        <Text style={styles.empty}>All saved surveys have been pushed.</Text>
       ) : (
         pending.map(item => (
           <SubmissionCard
@@ -179,14 +223,15 @@ export default function MySubmissionsScreen() {
             subtitle={`${item.scope || 'Survey'} · ${item.isViolation ? 'Violation' : 'No violation'}`}
             meta={[
               `Saved: ${formatDate(item.endTime)}`,
-              `Floors: ${item.noOfFloors ?? '-'}`,
-              `Violations: ${item.violations?.length ?? 0}`,
-              item.paused ? `Error: ${item.lastError || 'Upload paused'}` : '',
-              item.nextRetryAt ? `Next retry: ${formatDate(new Date(item.nextRetryAt).toISOString())}` : '',
+              item.paused ? `Last error: ${item.lastError || 'Upload paused'}` : 'Ready to push',
             ].filter(Boolean)}
-            status={item.paused ? 'Failed' : 'Waiting'}
+            apiFields={formatForwardCcSurveyPreview(item)}
+            status={item.paused ? 'Failed' : 'Pending'}
             statusTone={item.paused ? 'warning' : 'muted'}
             imageUri={item.mainImageUri}
+            actionLabel={pushingId === item.localId ? 'Pushing...' : 'Push to API now'}
+            onAction={() => handlePushOne(item.localId)}
+            actionDisabled={syncing || pushingId != null}
           />
         ))
       )}
@@ -233,6 +278,16 @@ const styles = StyleSheet.create({
   statusBadge: {fontSize: 12, fontWeight: '600'},
   cardSubtitle: {fontSize: 13, color: colors.text, marginTop: 4},
   cardMeta: {fontSize: 12, color: colors.mutedText, marginTop: 4},
+  apiBlock: {
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  apiTitle: {fontSize: 11, fontWeight: '700', color: colors.primary, marginBottom: 6},
+  apiLine: {fontSize: 11, color: colors.text, fontFamily: 'monospace', marginBottom: 2},
   thumbnail: {
     width: '100%',
     height: 120,
@@ -240,4 +295,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f3f4f6',
   },
+  cardAction: {
+    marginTop: 10,
+    backgroundColor: colors.primaryLight,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  cardActionText: {color: '#ffffff', fontSize: 13, fontWeight: '600'},
 });

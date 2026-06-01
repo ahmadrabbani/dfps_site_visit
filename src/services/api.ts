@@ -2,16 +2,12 @@ import {
   BYPASS_LOGIN,
   getBypassLoginUsername,
   getCcApplicationListUrl,
-  getCcPortalSubmitUrl,
   getLoginUrl,
   getViolationListUrl,
 } from '../config/env';
 import {getPortalSessionCookie} from './authService';
-import {
-  buildPortalCcSurveyFormData,
-  extractSessionCookie,
-  parsePortalCcSubmitResponse,
-} from './portalCcSurvey';
+import {buildForwardCcSurveyFormData} from './ccSurveySubmit';
+import {extractSessionCookie, parsePortalCcSubmitResponse} from './portalCcSurvey';
 import {generateSurveyApiKey} from './surveyApiKey';
 import type {PendingVisitBase} from './storage';
 
@@ -371,24 +367,31 @@ export async function fetchViolationTypes(scope = 'residential'): Promise<Penalt
   return mapCcViolationList(items);
 }
 
-export async function pushSiteVisit(visit: PendingVisitBase): Promise<unknown> {
+export async function pushSiteVisit(visit: PendingVisitBase): Promise<{serverMessage?: string}> {
+  const url = getCcSurveyUrl();
+  const formData = buildForwardCcSurveyFormData(visit);
   const cookie = await getPortalSessionCookie();
-  if (!cookie) {
-    throw new Error('Session expired. Please sign in again to submit surveys.');
-  }
-
-  const url = getCcPortalSubmitUrl();
-  const formData = buildPortalCcSurveyFormData(visit);
 
   if (__DEV__) {
-    console.log('[pushSiteVisit] POST portal', url);
+    console.log('[pushSiteVisit] POST', url);
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {Cookie: cookie},
-    body: formData,
-  });
+  const headers: Record<string, string> = {};
+  if (cookie) {
+    headers.Cookie = cookie;
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(`Cannot reach survey API: ${detail}`);
+  }
 
   const text = await res.text();
   if (!res.ok) {

@@ -118,13 +118,24 @@ function SiteVisitRouteScreen() {
             violations: survey.violations,
           };
           await addPendingVisit(visit);
-          const syncResult = await syncPending();
-          if (syncResult.uploaded > 0) {
-            notifySuccess('Site visit uploaded to the server.');
-          } else {
-            notifySuccess('Site visit saved on device. It will sync when online.');
+          let uploadedToApi = false;
+          let uploadError: string | null = null;
+          try {
+            const syncResult = await syncPending();
+            uploadedToApi = syncResult.uploaded > 0;
+            if (uploadedToApi) {
+              notifySuccess('Survey pushed to forward_cc_survey.php.');
+            } else if (syncResult.failed > 0) {
+              uploadError = 'Upload failed. Push from My Submissions when online.';
+              notifySuccess('Survey saved on device. Push to API from My Submissions.');
+            } else {
+              notifySuccess('Survey saved on device. Push to API from My Submissions.');
+            }
+          } catch (e) {
+            uploadError = (e as Error).message;
+            notifySuccess('Survey saved on device. Push to API from My Submissions.');
           }
-          navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit});
+          navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit, uploadedToApi, uploadError});
         }}
       />
     </SafeAreaView>
@@ -173,6 +184,8 @@ function SummaryRouteScreen() {
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <SummaryScreen
         visit={visit}
+        uploadedToApi={route.params?.uploadedToApi}
+        uploadError={route.params?.uploadError}
         onDone={() => {
           navigation.reset({index: 0, routes: [{name: MAIN_STACK_ROUTES.Dashboard}]});
         }}
