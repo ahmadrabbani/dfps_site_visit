@@ -1,6 +1,7 @@
 /**
  * Runs before test files load. Mocks native modules pulled in by static imports in App/screens.
  */
+require('react-native-get-random-values');
 jest.mock('@react-navigation/drawer', () => {
   const React = require('react');
   const {View} = require('react-native');

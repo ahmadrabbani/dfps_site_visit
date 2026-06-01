@@ -254,10 +254,54 @@ interface SurveyApiErrorPayload {
   error?: string;
 }
 
-function appendSurveyApiQuery(baseUrl: string, params: Record<string, string>): string {
-  const key = generateSurveyApiKey();
-  const query = new URLSearchParams({key, ...params});
-  return `${baseUrl}?${query.toString()}`;
+function buildSurveyListUrl(
+  baseUrl: string,
+  params: Record<string, string>,
+  options: {withHourlyKey?: boolean} = {},
+): string {
+  const queryParams: Record<string, string> = {...params};
+  if (options.withHourlyKey) {
+    try {
+      queryParams.key = generateSurveyApiKey();
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e);
+      throw new Error(`Survey API key error: ${detail}`);
+    }
+  }
+  return `${baseUrl}?${new URLSearchParams(queryParams).toString()}`;
+}
+
+async function fetchSurveyJson(url: string, label: string): Promise<unknown> {
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'GET',
+      headers: {Accept: 'application/json'},
+    });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    throw new Error(`${label}: ${detail}`);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${label}: HTTP ${res.status} ${text}`.trim());
+  }
+  return res.json() as Promise<unknown>;
+}
+
+async function fetchSurveyListWithKeyFallback(
+  baseUrl: string,
+  params: Record<string, string>,
+  label: string,
+): Promise<unknown> {
+  const plainUrl = buildSurveyListUrl(baseUrl, params, {withHourlyKey: false});
+  let payload = await fetchSurveyJson(plainUrl, label);
+  const listError = parseSurveyListError(payload);
+  if (listError === 'Invalid Access') {
+    const signedUrl = buildSurveyListUrl(baseUrl, params, {withHourlyKey: true});
+    payload = await fetchSurveyJson(signedUrl, label);
+  }
+  return payload;
 }
 
 function parseSurveyListError(payload: unknown): string | null {
@@ -274,32 +318,26 @@ function parseSurveyListError(payload: unknown): string | null {
   return null;
 }
 
-/** Loads cases for CC survey (cc_application_list.php). */
+/**
+ * Loads cases (cc_application_list.php).
+ * Same as browser: ?u=base64(username) — no hourly key unless server returns Invalid Access.
+ */
 export async function fetchCaseList(
   officerName: string,
   scope: string = 'residential',
 ): Promise<CcCaseItem[]> {
   const baseUrl = getCcApplicationListUrl();
   const userParam = encodeUserParam(officerName);
-  const category = scopeToSurveyCategory(scope);
-  const params: Record<string, string> = {category};
-  if (userParam) {
-    params.u = userParam;
-  }
-  const url = appendSurveyApiQuery(baseUrl, params);
-
-  let res: Response;
-  try {
-    res = await fetch(url);
-  } catch {
-    throw new Error('Cannot reach case list server. Check internet connection.');
-  }
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to load cases: ${text}`);
+  if (!userParam) {
+    throw new Error('Officer username is required to load cases.');
   }
 
-  const payload = (await res.json()) as CcCaseItem[] | SurveyApiErrorPayload;
+  const payload = (await fetchSurveyListWithKeyFallback(
+    baseUrl,
+    {u: userParam},
+    'Case list',
+  )) as CcCaseItem[] | SurveyApiErrorPayload;
+
   const listError = parseSurveyListError(payload);
   if (listError) {
     throw new Error(listError);
@@ -320,14 +358,11 @@ export async function fetchViolationTypes(scope = 'residential'): Promise<Penalt
 
   const baseUrl = getViolationListUrl();
   const category = scopeToViolationCategory(scope);
-  const url = appendSurveyApiQuery(baseUrl, {category});
-  const res = await fetch(url);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to load violations: ${text}`);
-  }
-
-  const payload = (await res.json()) as CcViolationListItem[] | {data?: CcViolationListItem[]} | SurveyApiErrorPayload;
+  const payload = (await fetchSurveyListWithKeyFallback(
+    baseUrl,
+    {category},
+    'Violation list',
+  )) as CcViolationListItem[] | {data?: CcViolationListItem[]} | SurveyApiErrorPayload;
   const listError = parseSurveyListError(payload);
   if (listError) {
     throw new Error(listError);

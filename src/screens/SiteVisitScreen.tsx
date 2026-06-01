@@ -357,7 +357,7 @@ export default function SiteVisitScreen({
       </View>
 
       <Text style={styles.label}>Select Case *</Text>
-      <Text style={styles.helper}>Cases for {plotCategoryLabel} plot category</Text>
+      <Text style={styles.helper}>Your assigned cases (plot category applies to the survey form)</Text>
       {casesLoading || casesFetching ? (
         <View style={styles.loaderRow}>
           <ActivityIndicator color={colors.primary} />
