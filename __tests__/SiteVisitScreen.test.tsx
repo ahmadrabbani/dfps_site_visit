@@ -63,14 +63,14 @@ describe('SiteVisitScreen', () => {
     });
 
     fireEvent.press(screen.getByText('Case-101 / Plot A'));
-    fireEvent.press(screen.getByText('Yes'));
+    fireEvent.press(screen.getByText('Yes — Violation'));
     fireEvent.press(screen.getByText('+ Add Violation'));
 
     await waitFor(() => {
       expect(screen.getByText('Illegal extension')).toBeTruthy();
     });
 
-    fireEvent.changeText(screen.getByPlaceholderText('Max 50'), '3');
+    fireEvent.changeText(screen.getByPlaceholderText(/Enter 1/), '3');
 
     await waitFor(() => {
       expect(screen.getByText('Save Survey')).not.toBeDisabled();
@@ -95,5 +95,29 @@ describe('SiteVisitScreen', () => {
         ]),
       }),
     );
+  });
+
+  test('cannot choose violation until a case is selected', async () => {
+    renderWithQuery(
+      <SiteVisitScreen
+        user={{id: 1, username: 'officer.a', name: 'Officer A', token: 'token-a'}}
+        siteScope="residential"
+        onScopeChange={jest.fn()}
+        onCompleteVisit={jest.fn()}
+        onAddViolation={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Case-101 / Plot A')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('Yes — Violation'));
+    expect(screen.queryByText('+ Add Violation')).toBeNull();
+    expect(screen.getByText('Select an application case above before answering.')).toBeTruthy();
+
+    fireEvent.press(screen.getByText('Case-101 / Plot A'));
+    fireEvent.press(screen.getByText('Yes — Violation'));
+    expect(screen.getByText('+ Add Violation')).toBeTruthy();
   });
 });

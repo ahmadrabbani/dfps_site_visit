@@ -13,9 +13,15 @@ import {
   FlatList,
   Pressable,
 } from 'react-native';
+import {Icon} from 'react-native-paper';
 import {useQuery} from '@tanstack/react-query';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
+import {FormLabel} from '../components/FormLabel';
+import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {colors} from '../theme/colors';
+import {formStyles} from '../theme/formStyles';
+import {screenContentPadding} from '../theme/screenLayout';
 import {CC_FLOOR_OPTIONS, CC_UNITS, CC_VIOLATION_REMARKS_MAX} from '../constants/ccSurvey';
 import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
 import {notifySuccess} from '../utils/notify';
@@ -56,6 +62,10 @@ export default function ViolationFormScreen({
   const [capturingPhoto, setCapturingPhoto] = useState(false);
   const [violationPickerOpen, setViolationPickerOpen] = useState(false);
   const [floorPickerOpen, setFloorPickerOpen] = useState(false);
+  const [widthFocused, setWidthFocused] = useState(false);
+  const [lengthFocused, setLengthFocused] = useState(false);
+  const [notesFocused, setNotesFocused] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const scopes: Array<{label: string; value: SiteScope}> = [
     {label: 'Residential', value: 'residential'},
@@ -191,26 +201,27 @@ export default function ViolationFormScreen({
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator>
-        <Text style={styles.header}>Violation</Text>
+        <Text style={styles.header}>Add violation</Text>
 
-        <Text style={styles.label}>Plot category</Text>
-        <View style={styles.chipRow}>
-          {scopes.map(option => (
-            <TouchableOpacity
-              key={option.value}
-              style={[
-                styles.chip,
-                option.value === scope ? styles.chipActive : styles.chipInactive,
-              ]}
-              onPress={() => onScopeChange(option.value)}>
-              <Text style={[styles.chipText, option.value === scope ? styles.chipTextActive : null]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <FormLabel title="Plot category" first>
+          <View style={styles.chipRow}>
+            {scopes.map(option => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.chip,
+                  option.value === scope ? styles.chipActive : styles.chipInactive,
+                ]}
+                onPress={() => onScopeChange(option.value)}>
+                <Text style={[styles.chipText, option.value === scope ? styles.chipTextActive : null]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </FormLabel>
 
-        <Text style={styles.label}>Select Violation *</Text>
+        <FormLabel title="Violation type" required hint="Choose the violation observed on site.">
         <TouchableOpacity
           style={[styles.selectField, (loading || error) && styles.selectFieldDisabled]}
           disabled={loading}
@@ -238,78 +249,100 @@ export default function ViolationFormScreen({
             <Text style={styles.smallButtonText}>Retry violations</Text>
           </TouchableOpacity>
         ) : null}
+        </FormLabel>
 
-        <Text style={styles.label}>Unit *</Text>
-        <View style={styles.chipRow}>
-          {CC_UNITS.map(option => (
-            <TouchableOpacity
-              key={option.value}
-              style={[styles.chip, unit === option.value ? styles.chipActive : styles.chipInactive]}
-              onPress={() => setUnit(option.value)}>
-              <Text style={[styles.chipText, unit === option.value ? styles.chipTextActive : null]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <FormLabel title="Measurement unit" required>
+          <View style={styles.chipRow}>
+            {CC_UNITS.map(option => (
+              <TouchableOpacity
+                key={option.value}
+                style={[styles.chip, unit === option.value ? styles.chipActive : styles.chipInactive]}
+                onPress={() => setUnit(option.value)}>
+                <Text style={[styles.chipText, unit === option.value ? styles.chipTextActive : null]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </FormLabel>
 
         <View style={styles.dimensionRow}>
           <View style={styles.dimensionCol}>
-            <Text style={styles.label}>Width</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="decimal-pad"
-              value={width}
-              onChangeText={setWidth}
-              placeholder="0.00"
-            />
+            <FormLabel title="Width" compact>
+              <TextInput
+                style={[styles.input, widthFocused && styles.inputFocused]}
+                onFocus={() => setWidthFocused(true)}
+                onBlur={() => setWidthFocused(false)}
+                keyboardType="decimal-pad"
+                value={width}
+                onChangeText={setWidth}
+                placeholder="0.00"
+                returnKeyType="next"
+                accessibilityLabel="Width input"
+                accessibilityHint="Enter the width of the violation"
+              />
+            </FormLabel>
           </View>
           <View style={styles.dimensionCol}>
-            <Text style={styles.label}>Length</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="decimal-pad"
-              value={length}
-              onChangeText={setLength}
-              placeholder="0.00"
-            />
+            <FormLabel title="Length" compact>
+              <TextInput
+                style={[styles.input, lengthFocused && styles.inputFocused]}
+                onFocus={() => setLengthFocused(true)}
+                onBlur={() => setLengthFocused(false)}
+                keyboardType="decimal-pad"
+                value={length}
+                onChangeText={setLength}
+                placeholder="0.00"
+                returnKeyType="done"
+                accessibilityLabel="Length input"
+                accessibilityHint="Enter the length of the violation"
+              />
+            </FormLabel>
           </View>
         </View>
 
-        <Text style={styles.label}>Floor *</Text>
-        <TouchableOpacity style={styles.selectField} onPress={() => setFloorPickerOpen(true)}>
-          <Text style={styles.selectFieldText}>{floorLabel(floorLabelValue)}</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.label}>Violation Image</Text>
-        <View style={styles.row}>
-          <TouchableOpacity
-            style={[styles.smallButton, capturingPhoto ? styles.smallButtonDisabled : null]}
-            disabled={capturingPhoto}
-            onPress={() => pickPhoto(true)}>
-            <Text style={styles.smallButtonText}>Camera</Text>
+        <FormLabel title="Building floor" required>
+          <TouchableOpacity style={styles.selectField} onPress={() => setFloorPickerOpen(true)}>
+            <Text style={styles.selectFieldText}>{floorLabel(floorLabelValue)}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.smallButton, styles.secondaryButton, capturingPhoto ? styles.smallButtonDisabled : null]}
-            disabled={capturingPhoto}
-            onPress={() => pickPhoto(false)}>
-            <Text style={[styles.smallButtonText, styles.secondaryButtonText]}>Browse</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.photoMeta}>{photoUri ? 'Image attached' : 'No file chosen'}</Text>
-        {photoUri ? <Image source={{uri: photoUri}} style={styles.photoPreview} /> : null}
+        </FormLabel>
 
-        <Text style={styles.label}>
-          Remarks ({notes.length}/{CC_VIOLATION_REMARKS_MAX})
-        </Text>
-        <TextInput
-          style={[styles.input, styles.notesInput]}
-          multiline
-          value={notes}
-          maxLength={CC_VIOLATION_REMARKS_MAX}
-          onChangeText={setNotes}
-          placeholder={`Max ${CC_VIOLATION_REMARKS_MAX} characters`}
-        />
+        <FormLabel
+          title="Violation photo (local only)"
+          hint="Optional. One photo for this violation — saved on your device with the visit. It is not uploaded as main_image. Use Site sketch on the DFPS Site Visit screen for the photo sent to the server.">
+          <PhotoPickerButtons
+            disabled={capturingPhoto}
+            onCamera={() => pickPhoto(true)}
+            onGallery={() => pickPhoto(false)}
+            cameraLabel="Take photo"
+            galleryLabel="From gallery"
+            cameraAccessibilityLabel="Take violation photo with camera"
+            galleryAccessibilityLabel="Choose violation photo from gallery"
+          />
+          <Text style={styles.photoMeta}>
+            {photoUri
+              ? 'Violation photo attached (local copy)'
+              : 'No violation photo — optional, stored on device only'}
+          </Text>
+          {photoUri ? <Image source={{uri: photoUri}} style={styles.photoPreview} /> : null}
+        </FormLabel>
+
+        <FormLabel
+          title={`Notes (${notes.length}/${CC_VIOLATION_REMARKS_MAX})`}
+          hint="Optional short description of this violation.">
+          <TextInput
+            style={[styles.input, formStyles.notesInput, notesFocused && styles.inputFocused]}
+            onFocus={() => setNotesFocused(true)}
+            onBlur={() => setNotesFocused(false)}
+            multiline
+            value={notes}
+            maxLength={CC_VIOLATION_REMARKS_MAX}
+            onChangeText={setNotes}
+            placeholder={`Up to ${CC_VIOLATION_REMARKS_MAX} characters`}
+            accessibilityLabel="Violation notes input"
+            accessibilityHint="Optional description of the observed violation"
+          />
+        </FormLabel>
 
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.actionButton, styles.cancel]} onPress={onCancel}>
@@ -323,8 +356,15 @@ export default function ViolationFormScreen({
 
       <Modal visible={violationPickerOpen} animationType="slide" onRequestClose={() => setViolationPickerOpen(false)}>
         <View style={styles.modalRoot}>
-          <Text style={styles.modalTitle}>Select Violation</Text>
+          <View style={styles.modalHeaderRow}>
+            <Text style={styles.modalTitle}>Select Violation</Text>
+            <TouchableOpacity style={styles.modalCloseHeader} onPress={() => setViolationPickerOpen(false)}>
+              <Icon source="close" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
           <FlatList
+            style={styles.modalList}
+            contentContainerStyle={styles.modalListContent}
             data={penaltyTypes}
             keyExtractor={item => String(item.id)}
             renderItem={({item}) => (
@@ -344,7 +384,9 @@ export default function ViolationFormScreen({
               </Pressable>
             )}
           />
-          <TouchableOpacity style={styles.modalClose} onPress={() => setViolationPickerOpen(false)}>
+          <TouchableOpacity
+            style={[styles.modalClose, {marginBottom: Math.max(insets.bottom, 16) + 8}]}
+            onPress={() => setViolationPickerOpen(false)}>
             <Text style={styles.modalCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -352,8 +394,15 @@ export default function ViolationFormScreen({
 
       <Modal visible={floorPickerOpen} animationType="slide" onRequestClose={() => setFloorPickerOpen(false)}>
         <View style={styles.modalRoot}>
-          <Text style={styles.modalTitle}>Select Floor</Text>
+          <View style={styles.modalHeaderRow}>
+            <Text style={styles.modalTitle}>Select Floor</Text>
+            <TouchableOpacity style={styles.modalCloseHeader} onPress={() => setFloorPickerOpen(false)}>
+              <Icon source="close" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
           <FlatList
+            style={styles.modalList}
+            contentContainerStyle={styles.modalListContent}
             data={CC_FLOOR_OPTIONS}
             keyExtractor={item => item}
             renderItem={({item}) => (
@@ -376,7 +425,9 @@ export default function ViolationFormScreen({
               </Pressable>
             )}
           />
-          <TouchableOpacity style={styles.modalClose} onPress={() => setFloorPickerOpen(false)}>
+          <TouchableOpacity
+            style={[styles.modalClose, {marginBottom: Math.max(insets.bottom, 16) + 8}]}
+            onPress={() => setFloorPickerOpen(false)}>
             <Text style={styles.modalCloseText}>Close</Text>
           </TouchableOpacity>
         </View>
@@ -387,12 +438,11 @@ export default function ViolationFormScreen({
 
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.background},
-  container: {padding: 16, paddingBottom: 32, flexGrow: 1},
-  header: {fontSize: 20, fontWeight: '700', color: colors.primary, marginBottom: 8},
-  label: {fontSize: 13, color: colors.mutedText, marginTop: 12, marginBottom: 6},
+  container: {...screenContentPadding(16, 32), flexGrow: 1},
+  header: {fontSize: 20, fontWeight: '700', color: colors.primary, marginBottom: 4},
   selectField: {
     borderWidth: 1,
-    borderColor: '#d1d5db',
+    borderColor: '#c5d0de',
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#ffffff',
@@ -403,14 +453,16 @@ const styles = StyleSheet.create({
   selectFieldText: {fontSize: 14, color: colors.text},
   input: {
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: '#c5d0de',
     borderRadius: 8,
     padding: 10,
     backgroundColor: '#ffffff',
     fontSize: 14,
     color: colors.text,
   },
-  notesInput: {minHeight: 80, textAlignVertical: 'top'},
+  inputFocused: {
+    borderColor: colors.primary,
+  },
   dimensionRow: {flexDirection: 'row'},
   dimensionCol: {flex: 1, marginRight: 8},
   chipRow: {flexDirection: 'row', flexWrap: 'wrap'},
@@ -428,10 +480,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
   },
-  secondaryButton: {backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.primaryLight},
   smallButtonDisabled: {opacity: 0.7},
   smallButtonText: {color: '#ffffff', fontSize: 12, fontWeight: '600'},
-  secondaryButtonText: {color: colors.primaryLight},
   photoMeta: {fontSize: 12, color: colors.mutedText, marginTop: 6},
   photoPreview: {
     width: '100%',
@@ -442,14 +492,36 @@ const styles = StyleSheet.create({
     borderColor: '#e5e7eb',
     backgroundColor: '#f3f4f6',
   },
-  actions: {flexDirection: 'row', justifyContent: 'space-between', marginTop: 24},
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 28,
+    marginBottom: 8,
+  },
   actionButton: {flex: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center'},
   cancel: {backgroundColor: '#e5e7eb', marginRight: 8},
   save: {backgroundColor: colors.primary, marginLeft: 8},
   actionText: {fontWeight: '600', color: colors.text},
   actionTextOnPrimary: {color: '#ffffff'},
   modalRoot: {flex: 1, backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16},
-  modalTitle: {fontSize: 18, fontWeight: '700', color: colors.primary, marginBottom: 12},
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  modalTitle: {fontSize: 18, fontWeight: '700', color: colors.primary, flex: 1, paddingRight: 12},
+  modalCloseHeader: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  modalList: {flex: 1},
+  modalListContent: {paddingBottom: 8},
   modalRow: {
     paddingVertical: 12,
     paddingHorizontal: 10,
@@ -463,12 +535,16 @@ const styles = StyleSheet.create({
   modalRowText: {fontSize: 14, color: colors.text},
   modalRowTextActive: {color: '#ffffff'},
   modalClose: {
-    marginTop: 12,
-    marginBottom: 24,
+    marginTop: 20,
     backgroundColor: colors.primary,
-    paddingVertical: 14,
-    borderRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  modalCloseText: {color: '#ffffff', fontWeight: '600'},
+  modalCloseText: {color: '#ffffff', fontWeight: '700', fontSize: 16},
 });

@@ -17,7 +17,9 @@ import {
   type SubmittedVisitRecord,
 } from '../services/storage';
 import {retryFailedNow, syncPending, syncVisitById} from '../services/syncService';
+import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
+import {screenContentPadding} from '../theme/screenLayout';
 import {notifyInfo, notifySuccess} from '../utils/notify';
 
 function formatDate(iso?: string) {
@@ -68,7 +70,7 @@ function SubmissionCard({
       ))}
       {apiFields && apiFields.length > 0 ? (
         <View style={styles.apiBlock}>
-          <Text style={styles.apiTitle}>API payload (forward_cc_survey.php)</Text>
+          <Text style={styles.apiTitle}>Server upload fields (preview)</Text>
           {apiFields.map(line => (
             <Text key={line} style={styles.apiLine}>
               {line}
@@ -118,9 +120,9 @@ export default function MySubmissionsScreen() {
     try {
       const result = await syncPending();
       if (result.uploaded === 0 && result.failed === 0 && result.deferred === 0 && result.paused === 0) {
-        notifyInfo('Nothing waiting to push.');
+        notifyInfo(uploadCopy.nothingToPush);
       } else if (result.uploaded > 0) {
-        notifySuccess(`${result.uploaded} survey(s) sent to the API.`);
+        notifySuccess(uploadCopy.sentCount(result.uploaded));
       }
       await refresh();
     } finally {
@@ -133,7 +135,7 @@ export default function MySubmissionsScreen() {
     try {
       const result = await retryFailedNow();
       if (result.uploaded > 0) {
-        notifySuccess(`${result.uploaded} survey(s) sent to the API.`);
+        notifySuccess(uploadCopy.sentCount(result.uploaded));
       }
       await refresh();
     } finally {
@@ -146,7 +148,7 @@ export default function MySubmissionsScreen() {
     try {
       const result = await syncVisitById(localId);
       if (result.uploaded > 0) {
-        notifySuccess('Survey pushed to the API.');
+        notifySuccess(uploadCopy.pushedToServer);
       }
       await refresh();
     } finally {
@@ -164,10 +166,10 @@ export default function MySubmissionsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.header}>My Submissions</Text>
+      <Text style={styles.header}>My Site Visits & Submissions</Text>
       <Text style={styles.lead}>
-        Surveys are saved on this device, then POSTed to forward_cc_survey.php with: case_id, is_violation,
-        visit_by, visit_by_name, remarks, lat, lng, main_image, no_of_floors, plot_category.
+        Site visits are saved on this device first. When you are online, use the button below to send
+        your DFPS site visit data to the server.
       </Text>
 
       <View style={styles.actions}>
@@ -178,7 +180,7 @@ export default function MySubmissionsScreen() {
           {syncing ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.primaryBtnText}>Push all pending to API</Text>
+            <Text style={styles.primaryBtnText}>{uploadCopy.pushAllPending}</Text>
           )}
         </TouchableOpacity>
         {pending.some(v => v.paused || (v.retryCount || 0) > 0) ? (
@@ -186,7 +188,7 @@ export default function MySubmissionsScreen() {
             style={[styles.secondaryBtn, syncing && styles.btnDisabled]}
             disabled={syncing}
             onPress={handleRetryAll}>
-            <Text style={styles.secondaryBtnText}>Retry failed uploads</Text>
+            <Text style={styles.secondaryBtnText}>{uploadCopy.retryFailed}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -212,9 +214,9 @@ export default function MySubmissionsScreen() {
         ))
       )}
 
-      <Text style={styles.sectionTitle}>Saved on device — not pushed yet ({pending.length})</Text>
+      <Text style={styles.sectionTitle}>Saved on device — not on server yet ({pending.length})</Text>
       {pending.length === 0 ? (
-        <Text style={styles.empty}>All saved surveys have been pushed.</Text>
+        <Text style={styles.empty}>All saved site visits are on the server.</Text>
       ) : (
         pending.map(item => (
           <SubmissionCard
@@ -223,13 +225,15 @@ export default function MySubmissionsScreen() {
             subtitle={`${item.scope || 'Survey'} · ${item.isViolation ? 'Violation' : 'No violation'}`}
             meta={[
               `Saved: ${formatDate(item.endTime)}`,
-              item.paused ? `Last error: ${item.lastError || 'Upload paused'}` : 'Ready to push',
+              item.paused
+                ? `Last error: ${item.lastError || 'Upload paused'}`
+                : 'Ready to send to server',
             ].filter(Boolean)}
             apiFields={formatForwardCcSurveyPreview(item)}
             status={item.paused ? 'Failed' : 'Pending'}
             statusTone={item.paused ? 'warning' : 'muted'}
             imageUri={item.mainImageUri}
-            actionLabel={pushingId === item.localId ? 'Pushing...' : 'Push to API now'}
+            actionLabel={pushingId === item.localId ? uploadCopy.pushingOne : uploadCopy.pushOneNow}
             onAction={() => handlePushOne(item.localId)}
             actionDisabled={syncing || pushingId != null}
           />
@@ -241,7 +245,11 @@ export default function MySubmissionsScreen() {
 
 const styles = StyleSheet.create({
   center: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background},
-  container: {padding: 16, paddingBottom: 32, backgroundColor: colors.background, flexGrow: 1},
+  container: {
+    ...screenContentPadding(16, 32),
+    backgroundColor: colors.background,
+    flexGrow: 1,
+  },
   header: {fontSize: 20, fontWeight: '700', color: colors.primary},
   lead: {fontSize: 13, color: colors.mutedText, marginTop: 8, marginBottom: 16, lineHeight: 18},
   actions: {marginBottom: 20},

@@ -5,6 +5,8 @@ import LoginScreen from './screens/LoginScreen';
 import AuthenticatedFlow from './navigation/AuthenticatedFlow';
 import {ROOT_ROUTES} from './navigation/routeNames';
 import {startSyncWatcher, stopSyncWatcher} from './services/syncService';
+import {clearNavigationPersistence} from './navigation/PersistedNavigation';
+import {clearAndroidLocationPrepared} from './utils/locationSession';
 import {clearSession, loadSession, saveSession} from './services/authService';
 import type {SessionUser} from './services/api';
 import type {SiteScope, ViolationDraft} from './types/app';
@@ -72,6 +74,8 @@ export default function App() {
 
   const handleSignOut = useCallback(async () => {
     await clearSession();
+    await clearNavigationPersistence();
+    clearAndroidLocationPrepared();
     setUser(null);
     violationDraftRef.current = null;
   }, []);

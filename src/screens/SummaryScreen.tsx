@@ -1,7 +1,9 @@
 import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, ScrollView} from 'react-native';
 import {formatForwardCcSurveyPreview} from '../services/ccSurveySubmit';
+import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
+import {screenContentPadding} from '../theme/screenLayout';
 import type {PendingVisit} from '../services/storage';
 
 interface SummaryScreenProps {
@@ -33,15 +35,15 @@ export default function SummaryScreen({visit, uploadedToApi, uploadError, onDone
       </Text>
 
       {uploadedToApi ? (
-        <Text style={styles.bannerOk}>Pushed to forward_cc_survey.php</Text>
+        <Text style={styles.bannerOk}>{uploadCopy.pushedToServer}</Text>
       ) : (
         <Text style={styles.bannerPending}>
-          Saved on device only. Open My Submissions → Push to API now.
+          {uploadCopy.summaryPending}
           {uploadError ? `\n${uploadError}` : ''}
         </Text>
       )}
 
-      <Text style={styles.sectionTitle}>API fields sent / queued</Text>
+      <Text style={styles.sectionTitle}>Server upload fields (preview)</Text>
       <View style={styles.apiBlock}>
         {apiFields.map(line => (
           <Text key={line} style={styles.apiLine}>
@@ -75,8 +77,16 @@ export default function SummaryScreen({visit, uploadedToApi, uploadError, onDone
 }
 
 const styles = StyleSheet.create({
-  container: {flex: 1, padding: 16, backgroundColor: colors.background},
-  scroll: {padding: 16, paddingBottom: 32, backgroundColor: colors.background, flexGrow: 1},
+  container: {
+    flex: 1,
+    ...screenContentPadding(16, 16),
+    backgroundColor: colors.background,
+  },
+  scroll: {
+    ...screenContentPadding(16, 32),
+    backgroundColor: colors.background,
+    flexGrow: 1,
+  },
   header: {fontSize: 20, fontWeight: '700', color: colors.primary},
   sub: {fontSize: 13, color: colors.mutedText, marginTop: 4, marginBottom: 12},
   bannerOk: {

@@ -19,8 +19,9 @@ if (sentryDsn) {
   });
 }
 import {StyleSheet} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
 import type {LinkingOptions, ParamListBase} from '@react-navigation/native';
+import PersistedNavigation from './src/navigation/PersistedNavigation';
+import ToastProvider from './src/components/toast/ToastProvider';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
@@ -53,9 +54,11 @@ export default function Root() {
       <QueryClientProvider client={queryClient}>
         <PaperProvider theme={appTheme}>
           <SafeAreaProvider>
-            <NavigationContainer linking={appLinking}>
-              <App />
-            </NavigationContainer>
+            <ToastProvider>
+              <PersistedNavigation linking={appLinking}>
+                <App />
+              </PersistedNavigation>
+            </ToastProvider>
           </SafeAreaProvider>
         </PaperProvider>
       </QueryClientProvider>

@@ -20,6 +20,7 @@ export async function saveSession(user: SessionUser): Promise<boolean> {
     token: user.token,
     portalCookie: user.portalCookie ?? null,
     isDevTestLogin: user.isDevTestLogin === true,
+    isBypassLogin: user.isBypassLogin === true,
   });
   const result = await Keychain.setGenericPassword('session', payload, {
     service: KEYCHAIN_SERVICE,
@@ -51,6 +52,7 @@ export async function loadSession(): Promise<SessionUser | null> {
       token: data.token,
       portalCookie: data.portalCookie ?? null,
       isDevTestLogin: data.isDevTestLogin === true,
+      isBypassLogin: data.isBypassLogin === true,
     };
   } catch (e) {
     reportServiceError('authService.loadSession', e);

@@ -17,11 +17,23 @@ import {
 import {
   createBypassLoginUser,
   createDevTestLoginUser,
+  isTestModeSession,
   login,
   mapCcViolationList,
   matchesDevTestLogin,
   parseLegacyLoginResponse,
-} from './api';import type {PendingVisitBase} from './storage';
+} from './api';
+import type {PendingVisitBase} from './storage';
+
+describe('isTestModeSession', () => {
+  it('is true only for dev or bypass sessions', () => {
+    expect(isTestModeSession(createDevTestLoginUser('junaid.tp3'))).toBe(true);
+    expect(isTestModeSession({id: 1, username: 'a', name: 'A', token: 't'})).toBe(false);
+    expect(isTestModeSession({id: 1, username: 'a', name: 'A', token: 't', isDevTestLogin: false})).toBe(
+      false,
+    );
+  });
+});
 
 describe('dev test login', () => {
   it('matches junaid.tp3 when bypass is enabled', () => {
@@ -60,6 +72,8 @@ describe('parseLegacyLoginResponse', () => {
       username: 'officer1',
       name: 'officer1',
       token: 'officer1',
+      isDevTestLogin: false,
+      isBypassLogin: false,
     });
   });
 
@@ -74,6 +88,8 @@ describe('parseLegacyLoginResponse', () => {
       username: '2125',
       name: 'Ali Khan',
       token: '2125',
+      isDevTestLogin: false,
+      isBypassLogin: false,
     });
   });
 
@@ -88,6 +104,8 @@ describe('parseLegacyLoginResponse', () => {
       username: '2125',
       name: '2125',
       token: '2125',
+      isDevTestLogin: false,
+      isBypassLogin: false,
     });
   });
 

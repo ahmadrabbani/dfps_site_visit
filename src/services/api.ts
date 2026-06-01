@@ -2,6 +2,7 @@ import {
   BYPASS_LOGIN,
   getBypassLoginUsername,
   getCcApplicationListUrl,
+  getCcSurveyUrl,
   getLoginUrl,
   getViolationListUrl,
 } from '../config/env';
@@ -64,6 +65,11 @@ export function createBypassLoginUser(username: string): SessionUser {
     portalCookie: null,
     isBypassLogin: true,
   };
+}
+
+/** True only for dev/test sign-in — not for real portal login (set BYPASS_LOGIN in .env to allow test login). */
+export function isTestModeSession(user: SessionUser | null | undefined): boolean {
+  return user?.isDevTestLogin === true || user?.isBypassLogin === true;
 }
 
 export interface PenaltyCategory {
@@ -185,6 +191,8 @@ export function parseLegacyLoginResponse(payload: unknown, username: string): Se
     username: trimmedUsername,
     name,
     token: String(id),
+    isDevTestLogin: false,
+    isBypassLogin: false,
   };
 }
 

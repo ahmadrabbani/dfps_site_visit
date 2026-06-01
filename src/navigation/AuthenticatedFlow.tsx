@@ -1,15 +1,15 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import {StyleSheet} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {
-  createDrawerNavigator,
-  DrawerContentScrollView,
-  DrawerItem,
-} from '@react-navigation/drawer';
+import {createDrawerNavigator} from '@react-navigation/drawer';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {AuthNavigationProvider, useAuthNavigation} from './AuthNavigationContext';
+import {MainStackDrawerHost, useDrawerInteraction} from './DrawerInteractionContext';
+import AppDrawerContent from '../components/AppDrawerContent';
 import AppHeader from '../components/AppHeader';
+import {uploadCopy} from '../constants/uploadCopy';
+import {colors} from '../theme/colors';
 import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
@@ -18,50 +18,13 @@ import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 import {addPendingVisit} from '../services/storage';
 import {syncPending} from '../services/syncService';
 import {notifySuccess} from '../utils/notify';
+import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
 import type {AuthNavigationContextValue, CcSurveyCompletePayload, SiteScope, ViolationDraft} from '../types/app';
 import type {SessionUser} from '../services/api';
 
 const Drawer = createDrawerNavigator();
 const Stack = createNativeStackNavigator();
-
-function AppDrawerContent(props: any) {
-  const {navigation} = props;
-  const {onSignOut} = useAuthNavigation();
-
-  return (
-    <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerScroll}>
-      <DrawerItem
-        label="Dashboard"
-        onPress={() => {
-          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.Dashboard});
-          navigation.closeDrawer();
-        }}
-      />
-      <DrawerItem
-        label="Site visit"
-        onPress={() => {
-          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.SiteVisit});
-          navigation.closeDrawer();
-        }}
-      />
-      <DrawerItem
-        label="My submissions"
-        onPress={() => {
-          navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.MySubmissions});
-          navigation.closeDrawer();
-        }}
-      />
-      <DrawerItem
-        label="Sign out"
-        onPress={() => {
-          navigation.closeDrawer();
-          onSignOut();
-        }}
-      />
-    </DrawerContentScrollView>
-  );
-}
 
 function MainStackHeader(props: any) {
   return <AppHeader navigation={props.navigation} routeName={props.route.name} />;
@@ -70,14 +33,30 @@ function MainStackHeader(props: any) {
 function DashboardRouteScreen() {
   const navigation = useNavigation<any>();
   const {user, setSiteScope} = useAuthNavigation();
+  const [startingVisit, setStartingVisit] = useState(false);
+
+  const handleStartVisit = async () => {
+    if (startingVisit) {
+      return;
+    }
+    setStartingVisit(true);
+    try {
+      setSiteScope('residential');
+      const allowed = await prepareSiteVisitLocation();
+      if (allowed) {
+        navigation.navigate(MAIN_STACK_ROUTES.SiteVisit, {locationPrepared: true});
+      }
+    } finally {
+      setStartingVisit(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <DashboardScreen
         user={user}
-        onStartVisit={() => {
-          setSiteScope('residential');
-          navigation.navigate(MAIN_STACK_ROUTES.SiteVisit);
-        }}
+        startingVisit={startingVisit}
+        onStartVisit={() => void handleStartVisit()}
       />
     </SafeAreaView>
   );
@@ -85,12 +64,15 @@ function DashboardRouteScreen() {
 
 function SiteVisitRouteScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const {user, siteScope, setSiteScope, violationDraftRef} = useAuthNavigation();
+  const locationPrepared = route.params?.locationPrepared === true;
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <SiteVisitScreen
         user={user}
         siteScope={siteScope}
+        locationPrepared={locationPrepared}
         onScopeChange={setSiteScope}
         onAddViolation={(currentViolations, setViolations) => {
           violationDraftRef.current = {currentViolations, setViolations};
@@ -124,16 +106,16 @@ function SiteVisitRouteScreen() {
             const syncResult = await syncPending();
             uploadedToApi = syncResult.uploaded > 0;
             if (uploadedToApi) {
-              notifySuccess('Survey pushed to forward_cc_survey.php.');
+              notifySuccess(uploadCopy.pushedToServer);
             } else if (syncResult.failed > 0) {
-              uploadError = 'Upload failed. Push from My Submissions when online.';
-              notifySuccess('Survey saved on device. Push to API from My Submissions.');
+              uploadError = uploadCopy.uploadFailedRetry;
+              notifySuccess(uploadCopy.savedPushFromSubmissions);
             } else {
-              notifySuccess('Survey saved on device. Push to API from My Submissions.');
+              notifySuccess(uploadCopy.savedPushFromSubmissions);
             }
           } catch (e) {
             uploadError = (e as Error).message;
-            notifySuccess('Survey saved on device. Push to API from My Submissions.');
+            notifySuccess(uploadCopy.savedPushFromSubmissions);
           }
           navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit, uploadedToApi, uploadError});
         }}
@@ -194,13 +176,24 @@ function SummaryRouteScreen() {
   );
 }
 
+function MainDrawerScreen() {
+  return (
+    <MainStackDrawerHost>
+      <MainStack />
+    </MainStackDrawerHost>
+  );
+}
+
 function MainStack() {
+  const {isDrawerOpen} = useDrawerInteraction();
   return (
     <Stack.Navigator
       screenOptions={{
         headerShown: true,
         header: MainStackHeader,
         animation: 'slide_from_right',
+        animationDuration: 280,
+        gestureEnabled: !isDrawerOpen,
       }}>
       <Stack.Screen name={MAIN_STACK_ROUTES.Dashboard} component={DashboardRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.SiteVisit} component={SiteVisitRouteScreen} />
@@ -234,20 +227,29 @@ export default function AuthenticatedFlow({
   return (
     <AuthNavigationProvider value={value}>
       <Drawer.Navigator
-        drawerContent={AppDrawerContent}
+        drawerContent={props => <AppDrawerContent {...props} />}
         screenOptions={{
           headerShown: false,
           drawerPosition: 'left',
+          drawerType: 'front',
           swipeEnabled: true,
-          overlayColor: 'rgba(0,0,0,0.35)',
+          overlayColor: 'rgba(0, 51, 102, 0.45)',
+          drawerStyle: {
+            width: '86%',
+            maxWidth: 320,
+            backgroundColor: '#ffffff',
+            marginBottom: 12,
+            borderBottomRightRadius: 16,
+            borderTopRightRadius: 0,
+          },
+          sceneContainerStyle: {backgroundColor: colors.background},
         }}>
-        <Drawer.Screen name={DRAWER_ROUTES.Main} component={MainStack} options={{title: 'Menu'}} />
+        <Drawer.Screen name={DRAWER_ROUTES.Main} component={MainDrawerScreen} options={{title: 'Menu'}} />
       </Drawer.Navigator>
     </AuthNavigationProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: {flex: 1, backgroundColor: '#f5f5f5'},
-  drawerScroll: {paddingTop: 8},
+  fill: {flex: 1, backgroundColor: colors.background},
 });

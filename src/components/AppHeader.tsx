@@ -1,18 +1,21 @@
 import React from 'react';
-import {StatusBar, StyleSheet} from 'react-native';
+import {StatusBar, StyleSheet, Text, View} from 'react-native';
 import {Appbar} from 'react-native-paper';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {DrawerActions} from '@react-navigation/native';
+import ConnectionStatusDot from './ConnectionStatusDot';
 import {colors} from '../theme/colors';
 import {useAuthNavigation} from '../navigation/AuthNavigationContext';
+import {useDrawerInteraction} from '../navigation/DrawerInteractionContext';
 import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
 
 const TITLES: Record<string, string> = {
   [MAIN_STACK_ROUTES.Dashboard]: 'Dashboard',
-  [MAIN_STACK_ROUTES.SiteVisit]: 'Site visit',
+  [MAIN_STACK_ROUTES.SiteVisit]: 'DFPS Site Visit',
   [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
   [MAIN_STACK_ROUTES.Summary]: 'Summary',
-  [MAIN_STACK_ROUTES.MySubmissions]: 'My submissions',
-  PendingUploads: 'Pending uploads',
+  [MAIN_STACK_ROUTES.MySubmissions]: 'My Site Visits & Submissions',
+  PendingUploads: 'Pending Uploads',
 };
 
 interface AppHeaderProps {
@@ -23,14 +26,15 @@ interface AppHeaderProps {
 export default function AppHeader({navigation, routeName}: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const {onSignOut} = useAuthNavigation();
+  const {isDrawerOpen} = useDrawerInteraction();
   const title = TITLES[routeName] || 'DFPS';
-  const canGoBack = navigation.canGoBack();
+  const canGoBack = navigation.canGoBack() && !isDrawerOpen;
 
   const openDrawer = () => {
-    const parent = navigation.getParent();
-    if (parent && typeof parent.openDrawer === 'function') {
-      parent.openDrawer();
+    if (isDrawerOpen) {
+      return;
     }
+    navigation.dispatch(DrawerActions.openDrawer());
   };
 
   return (
@@ -40,18 +44,33 @@ export default function AppHeader({navigation, routeName}: AppHeaderProps) {
         {canGoBack ? (
           <Appbar.BackAction
             accessibilityLabel="Go back"
-            onPress={() => navigation.goBack()}
+            disabled={isDrawerOpen}
+            onPress={() => {
+              if (!isDrawerOpen) {
+                navigation.goBack();
+              }
+            }}
             color="#ffffff"
           />
         ) : (
           <Appbar.Action
             accessibilityLabel="Open navigation menu"
             icon="menu"
+            disabled={isDrawerOpen}
             color="#ffffff"
             onPress={openDrawer}
           />
         )}
-        <Appbar.Content title={title} titleStyle={styles.title} />
+        <Appbar.Content
+          title={
+            <View style={styles.centerTitle}>
+              <ConnectionStatusDot size={12} />
+              <Text style={styles.title} numberOfLines={1}>
+                {title}
+              </Text>
+            </View>
+          }
+        />
         <Appbar.Action
           accessibilityLabel="Sign out"
           icon="logout"
@@ -64,6 +83,21 @@ export default function AppHeader({navigation, routeName}: AppHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-  header: {backgroundColor: colors.primary},
-  title: {color: '#ffffff'},
+  header: {
+    backgroundColor: colors.primary,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.2)',
+  },
+  centerTitle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    maxWidth: '100%',
+  },
+  title: {
+    color: '#ffffff',
+    fontWeight: '600',
+    fontSize: 17,
+    textAlign: 'center',
+  },
 });

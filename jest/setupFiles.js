@@ -30,11 +30,42 @@ jest.mock('@react-navigation/drawer', () => {
   return {createDrawerNavigator, DrawerContentScrollView, DrawerItem};
 });
 
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useFocusEffect: effect => {
+      React.useEffect(() => effect(), [effect]);
+    },
+  };
+});
+
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');
   Reanimated.default.call = () => {};
   return Reanimated;
 });
+
+jest.mock('../src/components/toast/ToastProvider', () => ({
+  __esModule: true,
+  default: ({children}) => children,
+}));
+
+jest.mock('../src/components/animated/FadeInView', () => ({
+  __esModule: true,
+  default: ({children}) => children,
+}));
+
+jest.mock('../src/components/ConnectionStatusDot', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock('../src/components/toast/ToastItem', () => ({
+  __esModule: true,
+  default: () => null,
+}));
 
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
@@ -104,14 +135,19 @@ jest.mock('react-native-geolocation-service', () => ({
 
 jest.mock('../src/utils/locationPermission', () => ({
   hasLocationPermission: jest.fn(() => Promise.resolve(true)),
+  hasAndroidLocationPermission: jest.fn(() => Promise.resolve(true)),
   requestLocationPermission: jest.fn(() => Promise.resolve(true)),
   ensureLocationPermission: jest.fn(() => Promise.resolve(true)),
+  syncAndroidLocationAfterGrant: jest.fn(() => Promise.resolve(true)),
+  waitForAndroidLocationPermission: jest.fn(() => Promise.resolve(true)),
   describeGpsError: jest.fn(() => 'GPS error'),
   isPermissionDeniedError: jest.fn(() => false),
+  isLocationSettingsError: jest.fn(() => false),
   openAppSettings: jest.fn(),
 }));
 
 jest.mock('../src/utils/deviceLocation', () => ({
   acquireDeviceCoords: jest.fn(() => Promise.resolve({lat: 31.5204, lng: 74.3587})),
   isGpsPermissionError: jest.fn(() => false),
+  isGpsSettingsError: jest.fn(() => false),
 }));

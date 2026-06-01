@@ -1,5 +1,5 @@
-import {Alert, Platform, ToastAndroid} from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
+import {notifyError, notifySuccess, notifyWarning} from '../utils/notify';
 import {
   getPendingVisits,
   markVisitUploaded,
@@ -20,24 +20,18 @@ function notifySyncSuccess(count: number) {
     count === 1
       ? 'Your site visit was received by the server.'
       : `${count} site visits were received by the server.`;
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(msg, ToastAndroid.LONG);
-  } else {
-    Alert.alert('Sync complete', msg);
-  }
+  notifySuccess(msg);
 }
 
 function notifySyncPartial(successCount: number, failCount: number) {
-  Alert.alert(
-    'Sync finished',
-    `${successCount} visit(s) received by the server.\n${failCount} could not be sent and will retry when you are online.`,
+  notifyWarning(
+    `${successCount} visit(s) received. ${failCount} could not be sent and will retry when online.`,
   );
 }
 
 function notifySyncAllFailed(failCount: number) {
-  Alert.alert(
-    'Upload not completed',
-    `${failCount} visit(s) could not be sent. They stay on this device and will retry automatically.`,
+  notifyError(
+    `${failCount} visit(s) could not be sent. They remain on this device and will retry automatically.`,
   );
 }
 

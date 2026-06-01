@@ -1,25 +1,33 @@
 import {Alert, Platform, ToastAndroid} from 'react-native';
+import {enqueueToast, type ToastVariant} from '../components/toast/toastController';
 
-function showAndroid(message: string) {
-  ToastAndroid.show(String(message), ToastAndroid.SHORT);
-}
-
-function showCrossPlatform(title: string, message: string) {
+function fallbackToast(message: string) {
   if (Platform.OS === 'android') {
-    showAndroid(message);
+    ToastAndroid.show(String(message), ToastAndroid.SHORT);
     return;
   }
-  Alert.alert(title, message);
+  Alert.alert('', String(message));
+}
+
+function show(variant: ToastVariant, message: string, durationMs?: number) {
+  const handled = enqueueToast({variant, message, durationMs});
+  if (!handled) {
+    fallbackToast(message);
+  }
 }
 
 export function notifyInfo(message: string) {
-  showCrossPlatform('Info', message);
+  show('info', message);
 }
 
 export function notifySuccess(message: string) {
-  showCrossPlatform('Success', message);
+  show('success', message);
 }
 
 export function notifyError(message: string) {
-  showCrossPlatform('Error', message);
+  show('error', message);
+}
+
+export function notifyWarning(message: string) {
+  show('warning', message);
 }

@@ -126,8 +126,8 @@ function envFlag(value: string): boolean {
 }
 
 /**
- * When true: `BYPASS_LOGIN_USERNAME` + any password signs in without calling the portal (dev testing).
- * Login screen also shows an optional “test without login” shortcut.
+ * BYPASS_LOGIN=true — enables test sign-in (`BYPASS_LOGIN_USERNAME` + any password, no portal call).
+ * BYPASS_LOGIN=false — real portal login only; dashboard test banner is hidden for real sessions.
  */
 export const BYPASS_LOGIN = envFlag(BYPASS_LOGIN_RAW);
 
