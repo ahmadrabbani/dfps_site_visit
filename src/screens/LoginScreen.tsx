@@ -19,8 +19,8 @@ import {Controller, useForm} from 'react-hook-form';
 import {zodResolver} from '@hookform/resolvers/zod';
 import {z} from 'zod';
 import {Button, Chip, HelperText, Surface, TextInput, useTheme} from 'react-native-paper';
-import {USE_FAKE_API} from '../config/env';
-import {login as loginRequest, type SessionUser} from '../services/api';
+import {BYPASS_LOGIN, USE_FAKE_API, getBypassLoginUsername} from '../config/env';
+import {createBypassLoginUser, login as loginRequest, type SessionUser} from '../services/api';
 import {notifyError, notifySuccess} from '../utils/notify';
 
 const backgroundImage = require('../../LDABackground.jpg');
@@ -74,7 +74,10 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
     watch,
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {username: '', password: ''},
+    defaultValues: {
+      username: BYPASS_LOGIN ? getBypassLoginUsername() : '',
+      password: '',
+    },
     mode: 'onSubmit',
   });
 
@@ -138,6 +141,13 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
       AccessibilityInfo.announceForAccessibility?.('Logging in, please wait.');
     }
   }, [submitting]);
+
+  const bypassUsername = getBypassLoginUsername();
+
+  const onTestBypass = () => {
+    clearErrors('root');
+    onLogin(createBypassLoginUser(bypassUsername));
+  };
 
   const onValidSubmit = async ({username, password}: LoginFormValues) => {
     clearErrors('root');
@@ -242,6 +252,17 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
                     Test mode - any username and password work
                   </Chip>
                 ) : null}
+                {BYPASS_LOGIN ? (
+                  <Chip
+                    icon="flask-outline"
+                    mode="flat"
+                    compact
+                    style={styles.testChip}
+                    textStyle={styles.testChipText}
+                    accessibilityLabel="Test login uses junaid.tp3 with any password.">
+                    Test login: {bypassUsername} + any password
+                  </Chip>
+                ) : null}
 
                 <Controller
                   control={control}
@@ -343,6 +364,21 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
                   accessibilityState={{disabled: submitting || !canSubmit, busy: submitting}}>
                   Sign in
                 </Button>
+
+                {BYPASS_LOGIN ? (
+                  <Button
+                    mode="outlined"
+                    onPress={onTestBypass}
+                    disabled={submitting}
+                    style={styles.testBypassButton}
+                    contentStyle={styles.buttonContent}
+                    labelStyle={styles.testBypassLabel}
+                    theme={inputTheme}
+                    accessibilityLabel={`Test without login as ${bypassUsername}`}
+                    accessibilityHint="Opens CC forms using test APIs only. Survey upload still needs sign in.">
+                    Test without login ({bypassUsername})
+                  </Button>
+                ) : null}
               </Surface>
             </Animated.View>
           </ScrollView>
@@ -458,5 +494,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     letterSpacing: 0.3,
+  },
+  testBypassButton: {
+    marginTop: 12,
+    borderRadius: BUTTON_RADIUS,
+    borderColor: '#8a6d00',
+  },
+  testBypassLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5c4a00',
   },
 });

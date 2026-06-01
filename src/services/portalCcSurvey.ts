@@ -1,4 +1,5 @@
 import type {PendingVisitBase, SiteVisitViolation} from './storage';
+import {CC_VIOLATION_REMARKS_MAX} from '../constants/ccSurvey';
 
 export type PortalCcSubmitJson = [string, string, string, ...string[]];
 
@@ -62,7 +63,7 @@ export function buildPortalCcSurveyFormData(visit: PendingVisitBase): FormData {
       formData.append('length[]', v.length != null ? String(v.length) : '');
       formData.append('floor[]', v.floorLabel || '');
       formData.append('unit[]', v.unit || 'sqft');
-      formData.append('remarks[]', v.notes || '');
+      formData.append('remarks[]', (v.notes || '').slice(0, CC_VIOLATION_REMARKS_MAX));
       if (v.photoUri) {
         formData.append('violation_img[]', imageFilePart(v.photoUri, `violation_${index}_${Date.now()}.jpg`));
       }

@@ -82,6 +82,11 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
 
+project.ext.vectoricons = [
+    iconFontNames: [ 'MaterialCommunityIcons.ttf' ]
+]
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -98,6 +103,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        // Housing portal test server uses HTTP (103.8.115.199:91).
+        manifestPlaceholders = [usesCleartextTraffic: "true"]
     }
     signingConfigs {
         debug {

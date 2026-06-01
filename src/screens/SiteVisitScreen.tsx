@@ -1,28 +1,32 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   ScrollView,
   TextInput,
   Alert,
   ActivityIndicator,
   Image,
 } from 'react-native';
-import Geolocation from 'react-native-geolocation-service';
 import {useQuery} from '@tanstack/react-query';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
-import {USE_FAKE_API} from '../config/env';
+import {BYPASS_LOGIN, USE_FAKE_API} from '../config/env';
 import {CC_MAX_FLOORS} from '../constants/ccSurvey';
 import {colors} from '../theme/colors';
 import {fetchCaseList, type SessionUser} from '../services/api';
 import type {SiteVisitViolation} from '../services/storage';
 import type {CcSurveyCompletePayload, SetViolations, SiteScope, ViolationChoice} from '../types/app';
+import {acquireDeviceCoords, isGpsPermissionError} from '../utils/deviceLocation';
+import {hasLocationPermission, openAppSettings, requestLocationPermission} from '../utils/locationPermission';
 import {notifyInfo} from '../utils/notify';
 
 const showTestGpsControls = typeof __DEV__ !== 'undefined' && __DEV__ && USE_FAKE_API;
+
+function formatCoord(value: number | null): string {
+  return value != null && Number.isFinite(value) ? value.toFixed(5) : '—';
+}
 
 interface SiteVisitScreenProps {
   user: SessionUser;
@@ -40,6 +44,9 @@ export default function SiteVisitScreen({
   onCompleteVisit,
 }: SiteVisitScreenProps) {
   const [gpsAllowed, setGpsAllowed] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(true);
+  const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsPermissionDenied, setGpsPermissionDenied] = useState(false);
   const [currentLat, setCurrentLat] = useState<number | null>(null);
   const [currentLng, setCurrentLng] = useState<number | null>(null);
   const [violations, setViolations] = useState<SiteVisitViolation[]>([]);
@@ -49,9 +56,84 @@ export default function SiteVisitScreen({
   const [remarks, setRemarks] = useState('');
   const [siteSketchUri, setSiteSketchUri] = useState<string | null>(null);
   const [capturingSketch, setCapturingSketch] = useState(false);
+  const [needsPermissionPrompt, setNeedsPermissionPrompt] = useState(false);
 
-  const targetLat = 31.5204;
-  const targetLon = 74.3587;
+  const mountedRef = useRef(true);
+  const gpsRunIdRef = useRef(0);
+
+  const applyCoords = useCallback((lat: number, lng: number) => {
+    setCurrentLat(lat);
+    setCurrentLng(lng);
+    setGpsAllowed(true);
+    setGpsLoading(false);
+    setGpsError(null);
+    setGpsPermissionDenied(false);
+    setNeedsPermissionPrompt(false);
+  }, []);
+
+  const runGpsFetch = useCallback(async (runId: number) => {
+    const isStale = () => !mountedRef.current || runId !== gpsRunIdRef.current;
+    try {
+      const coords = await acquireDeviceCoords();
+      if (isStale()) {
+        return;
+      }
+      applyCoords(coords.lat, coords.lng);
+    } catch (error) {
+      if (isStale()) {
+        return;
+      }
+      setGpsAllowed(false);
+      setGpsLoading(false);
+      setGpsPermissionDenied(isGpsPermissionError(error));
+      setGpsError((error as Error).message || 'Could not read GPS location.');
+    }
+  }, [applyCoords]);
+
+  const refreshGps = useCallback(
+    async (requestPermission: boolean) => {
+      const runId = ++gpsRunIdRef.current;
+      const isStale = () => !mountedRef.current || runId !== gpsRunIdRef.current;
+
+      setGpsLoading(true);
+      setGpsError(null);
+      setGpsPermissionDenied(false);
+      setNeedsPermissionPrompt(false);
+
+      let permitted = await hasLocationPermission();
+      if (!permitted && requestPermission) {
+        permitted = await requestLocationPermission();
+      }
+      if (isStale()) {
+        return;
+      }
+
+      if (!permitted) {
+        setGpsAllowed(false);
+        setGpsLoading(false);
+        setNeedsPermissionPrompt(true);
+        setGpsError('Tap Allow location, choose Allow in the system dialog, then wait.');
+        return;
+      }
+
+      await runGpsFetch(runId);
+    },
+    [runGpsFetch],
+  );
+
+  const useTestGpsFallback = useCallback(() => {
+    applyCoords(31.5204, 74.3587);
+    notifyInfo('Using test GPS coordinates (Lahore).');
+  }, [applyCoords]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void refreshGps(false);
+    return () => {
+      mountedRef.current = false;
+      gpsRunIdRef.current += 1;
+    };
+  }, [refreshGps]);
 
   const {
     data: cases = [],
@@ -74,20 +156,6 @@ export default function SiteVisitScreen({
   const caseAndCategoryReady = Boolean(selectedCaseId && siteScope);
   const showViolationSection = caseAndCategoryReady && isViolation;
   const showNoViolationSection = caseAndCategoryReady && isNoViolation;
-
-  useEffect(() => {
-    Geolocation.getCurrentPosition(
-      pos => {
-        const {latitude, longitude} = pos.coords;
-        setCurrentLat(latitude);
-        setCurrentLng(longitude);
-        const dist = distanceInMeters(latitude, longitude, targetLat, targetLon);
-        setGpsAllowed(dist < 100);
-      },
-      () => setGpsAllowed(false),
-      {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
-    );
-  }, []);
 
   useEffect(() => {
     setViolations([]);
@@ -204,9 +272,54 @@ export default function SiteVisitScreen({
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>Completion Certificate Survey</Text>
       <Text style={styles.siteInfo}>Officer: {user.name}</Text>
-      <View style={[styles.statusBadge, {backgroundColor: gpsAllowed ? colors.success : colors.danger}]}>
-        <Text style={styles.statusText}>{gpsAllowed ? 'On-site (GPS verified)' : 'Not at site location'}</Text>
+      <View
+        style={[
+          styles.statusBadge,
+          {
+            backgroundColor: gpsLoading
+              ? colors.mutedText
+              : gpsAllowed
+                ? colors.success
+                : colors.danger,
+          },
+        ]}>
+        <Text style={styles.statusText}>
+          {gpsLoading
+            ? 'Acquiring GPS location...'
+            : gpsAllowed
+              ? `GPS ready (${formatCoord(currentLat)}, ${formatCoord(currentLng)})`
+              : gpsError || 'GPS unavailable — allow location and retry'}
+        </Text>
       </View>
+      {!gpsLoading && !gpsAllowed ? (
+        <View style={styles.row}>
+          <TouchableOpacity
+            style={[styles.smallButton, gpsLoading ? styles.buttonDisabled : null]}
+            disabled={gpsLoading}
+            onPress={() => void refreshGps(needsPermissionPrompt || gpsPermissionDenied)}>
+            <Text style={styles.smallButtonText}>
+              {gpsLoading
+                ? 'Getting GPS...'
+                : needsPermissionPrompt || gpsPermissionDenied
+                  ? 'Allow location'
+                  : 'Retry GPS'}
+            </Text>
+          </TouchableOpacity>
+          {needsPermissionPrompt || gpsPermissionDenied ? (
+            <TouchableOpacity style={[styles.smallButton, styles.secondaryButton]} onPress={openAppSettings}>
+              <Text style={[styles.smallButtonText, styles.secondaryButtonText]}>Open Settings</Text>
+            </TouchableOpacity>
+          ) : null}
+          {BYPASS_LOGIN && !gpsLoading && !gpsAllowed ? (
+            <TouchableOpacity
+              style={[styles.smallButton, styles.secondaryButton]}
+              onPress={useTestGpsFallback}
+              disabled={gpsLoading}>
+              <Text style={[styles.smallButtonText, styles.secondaryButtonText]}>Use test GPS</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
       {showTestGpsControls ? (
         <Text style={styles.siteInfo}>Test mode active (fake API enabled).</Text>
       ) : null}
@@ -242,24 +355,25 @@ export default function SiteVisitScreen({
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={cases}
-          keyExtractor={item => item.id}
-          scrollEnabled={false}
-          ListEmptyComponent={<Text style={styles.helper}>No cases available for your account.</Text>}
-          renderItem={({item}) => (
-            <TouchableOpacity
-              style={[
-                styles.caseRow,
-                item.id === selectedCaseId ? styles.caseRowActive : styles.caseRowInactive,
-              ]}
-              onPress={() => setSelectedCaseId(item.id)}>
-              <Text style={[styles.caseText, item.id === selectedCaseId ? styles.caseTextActive : null]}>
-                {item.owc}
-              </Text>
-            </TouchableOpacity>
+        <View>
+          {cases.length === 0 ? (
+            <Text style={styles.helper}>No cases available for your account.</Text>
+          ) : (
+            cases.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[
+                  styles.caseRow,
+                  item.id === selectedCaseId ? styles.caseRowActive : styles.caseRowInactive,
+                ]}
+                onPress={() => setSelectedCaseId(item.id)}>
+                <Text style={[styles.caseText, item.id === selectedCaseId ? styles.caseTextActive : null]}>
+                  {item.owc}
+                </Text>
+              </TouchableOpacity>
+            ))
           )}
-        />
+        </View>
       )}
 
       <Text style={styles.label}>Is Violation? *</Text>
@@ -307,12 +421,11 @@ export default function SiteVisitScreen({
               <Text style={styles.addButtonText}>+ Add Violation</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={violations}
-            keyExtractor={(_, idx) => idx.toString()}
-            scrollEnabled={false}
-            renderItem={({item}) => (
-              <View style={styles.violationCard}>
+          {violations.length === 0 ? (
+            <Text style={styles.helper}>Add at least one violation.</Text>
+          ) : (
+            violations.map((item, idx) => (
+              <View key={`${item.violationTypeId}-${idx}`} style={styles.violationCard}>
                 <Text style={styles.violationType}>{item.typeLabel || item.type}</Text>
                 {item.floorLabel ? <Text style={styles.violationMeta}>Floor: {item.floorLabel}</Text> : null}
                 {item.unit ? <Text style={styles.violationMeta}>Unit: {item.unit}</Text> : null}
@@ -323,9 +436,8 @@ export default function SiteVisitScreen({
                 ) : null}
                 {item.notes ? <Text style={styles.violationNotes}>{item.notes}</Text> : null}
               </View>
-            )}
-            ListEmptyComponent={<Text style={styles.helper}>Add at least one violation.</Text>}
-          />
+            ))
+          )}
           <Text style={styles.label}>Remarks</Text>
           <TextInput
             style={[styles.input, styles.notesInput]}
@@ -334,24 +446,6 @@ export default function SiteVisitScreen({
             onChangeText={setRemarks}
             placeholder="Site position / visit remarks"
           />
-        </>
-      ) : null}
-
-      {showNoViolationSection ? (
-        <>
-          <Text style={styles.label}>General Remarks *</Text>
-          <TextInput
-            style={[styles.input, styles.notesInput]}
-            multiline
-            value={remarks}
-            onChangeText={setRemarks}
-            placeholder="Required when there is no violation"
-          />
-        </>
-      ) : null}
-
-      {(showViolationSection || showNoViolationSection) && (
-        <>
           <Text style={styles.label}>Upload Site Sketch</Text>
           <View style={styles.row}>
             <TouchableOpacity
@@ -369,7 +463,20 @@ export default function SiteVisitScreen({
           </View>
           {siteSketchUri ? <Image source={{uri: siteSketchUri}} style={styles.sketchPreview} /> : null}
         </>
-      )}
+      ) : null}
+
+      {showNoViolationSection ? (
+        <>
+          <Text style={styles.label}>General Remarks *</Text>
+          <TextInput
+            style={[styles.input, styles.notesInput]}
+            multiline
+            value={remarks}
+            onChangeText={setRemarks}
+            placeholder="Required when there is no violation"
+          />
+        </>
+      ) : null}
 
       <TouchableOpacity
         style={[styles.completeButton, canSave ? styles.completeButtonEnabled : styles.completeButtonDisabled]}
@@ -379,18 +486,6 @@ export default function SiteVisitScreen({
       </TouchableOpacity>
     </ScrollView>
   );
-}
-
-function distanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
 }
 
 const styles = StyleSheet.create({

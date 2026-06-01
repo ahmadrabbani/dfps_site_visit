@@ -96,7 +96,21 @@ jest.mock('react-native-geolocation-service', () => ({
     ),
     watchPosition: jest.fn(),
     clearWatch: jest.fn(),
-    requestAuthorization: jest.fn(),
+    requestAuthorization: jest.fn(() => Promise.resolve('granted')),
     stopObserving: jest.fn(),
   },
+}));
+
+jest.mock('../src/utils/locationPermission', () => ({
+  hasLocationPermission: jest.fn(() => Promise.resolve(true)),
+  requestLocationPermission: jest.fn(() => Promise.resolve(true)),
+  ensureLocationPermission: jest.fn(() => Promise.resolve(true)),
+  describeGpsError: jest.fn(() => 'GPS error'),
+  isPermissionDeniedError: jest.fn(() => false),
+  openAppSettings: jest.fn(),
+}));
+
+jest.mock('../src/utils/deviceLocation', () => ({
+  acquireDeviceCoords: jest.fn(() => Promise.resolve({lat: 31.5204, lng: 74.3587})),
+  isGpsPermissionError: jest.fn(() => false),
 }));

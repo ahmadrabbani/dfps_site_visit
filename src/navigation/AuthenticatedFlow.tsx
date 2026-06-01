@@ -53,6 +53,7 @@ function AppDrawerContent(props: any) {
         }}
       />
       <DrawerItem
+        label="Sign out"
         onPress={() => {
           navigation.closeDrawer();
           onSignOut();

@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No Auto Backup: uninstall must remove login, queue, and preferences. -->
+<full-backup-content />

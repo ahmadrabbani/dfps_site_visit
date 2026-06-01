@@ -13,7 +13,7 @@ import {
 import {useQuery} from '@tanstack/react-query';
 import {launchCamera} from 'react-native-image-picker';
 import {colors} from '../theme/colors';
-import {CC_FLOOR_OPTIONS, CC_UNITS} from '../constants/ccSurvey';
+import {CC_FLOOR_OPTIONS, CC_UNITS, CC_VIOLATION_REMARKS_MAX} from '../constants/ccSurvey';
 import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
 import {notifyInfo, notifySuccess} from '../utils/notify';
 import type {SiteVisitViolation} from '../services/storage';
@@ -138,7 +138,7 @@ export default function ViolationFormScreen({
       length: length ? parseFloat(length) : null,
       width: width ? parseFloat(width) : null,
       area: area ? parseFloat(area) : null,
-      notes,
+      notes: notes.slice(0, CC_VIOLATION_REMARKS_MAX),
       photoUri,
     };
     notifySuccess('Violation added to this visit.');
@@ -314,13 +314,14 @@ export default function ViolationFormScreen({
       <Text style={styles.label}>Area (sq.ft)</Text>
       <TextInput style={styles.input} keyboardType="numeric" value={area} onChangeText={setArea} />
 
-      <Text style={styles.label}>Notes</Text>
+      <Text style={styles.label}>Remarks ({notes.length}/{CC_VIOLATION_REMARKS_MAX})</Text>
       <TextInput
         style={[styles.input, styles.notesInput]}
         multiline
         value={notes}
+        maxLength={CC_VIOLATION_REMARKS_MAX}
         onChangeText={setNotes}
-        placeholder="Describe the violation"
+        placeholder={`Max ${CC_VIOLATION_REMARKS_MAX} characters`}
       />
 
       <Text style={styles.label}>Photo Evidence</Text>

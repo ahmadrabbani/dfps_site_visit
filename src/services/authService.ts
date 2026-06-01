@@ -19,9 +19,11 @@ export async function saveSession(user: SessionUser): Promise<boolean> {
     name: user.name ?? 'Officer',
     token: user.token,
     portalCookie: user.portalCookie ?? null,
+    isDevTestLogin: user.isDevTestLogin === true,
   });
   const result = await Keychain.setGenericPassword('session', payload, {
     service: KEYCHAIN_SERVICE,
+    accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
   if (result === false) {
     reportServiceError('authService.saveSession', 'Keychain save failed');
@@ -33,13 +35,13 @@ export async function saveSession(user: SessionUser): Promise<boolean> {
  * @returns user session if present, else null
  */
 export async function loadSession(): Promise<SessionUser | null> {
-  const creds = await Keychain.getGenericPassword({service: KEYCHAIN_SERVICE});
-  if (!creds || !('password' in creds) || !creds.password) {
-    return null;
-  }
   try {
+    const creds = await Keychain.getGenericPassword({service: KEYCHAIN_SERVICE});
+    if (!creds || !('password' in creds) || !creds.password) {
+      return null;
+    }
     const data = JSON.parse(creds.password) as SessionUser | null;
-    if (!data?.token) {
+    if (!data?.token || data.token === 'bypass') {
       return null;
     }
     return {
@@ -48,8 +50,10 @@ export async function loadSession(): Promise<SessionUser | null> {
       name: data.name ?? 'Officer',
       token: data.token,
       portalCookie: data.portalCookie ?? null,
+      isDevTestLogin: data.isDevTestLogin === true,
     };
-  } catch {
+  } catch (e) {
+    reportServiceError('authService.loadSession', e);
     return null;
   }
 }

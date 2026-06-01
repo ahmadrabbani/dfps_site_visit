@@ -1,10 +1,18 @@
-import {getCcApplicationListUrl, getCcPortalSubmitUrl, getLoginUrl, getViolationListUrl} from '../config/env';
+import {
+  BYPASS_LOGIN,
+  getBypassLoginUsername,
+  getCcApplicationListUrl,
+  getCcPortalSubmitUrl,
+  getLoginUrl,
+  getViolationListUrl,
+} from '../config/env';
 import {getPortalSessionCookie} from './authService';
 import {
   buildPortalCcSurveyFormData,
   extractSessionCookie,
   parsePortalCcSubmitResponse,
 } from './portalCcSurvey';
+import {generateSurveyApiKey} from './surveyApiKey';
 import type {PendingVisitBase} from './storage';
 
 // --- Fake API (disabled for live testing) ---
@@ -22,6 +30,44 @@ export interface SessionUser {
   token: string;
   /** PHP session cookie for conf_add_cc_form.php (portal submit). */
   portalCookie?: string | null;
+  /** Dev bypass — no portal session; submit will fail until real login. */
+  isBypassLogin?: boolean;
+  /** Dev test sign-in (junaid.tp3 + any password) — no portal cookie; session is saved locally. */
+  isDevTestLogin?: boolean;
+}
+
+/** Dev session for testing CC forms against real list/violation APIs without portal login. */
+export function matchesDevTestLogin(username: string): boolean {
+  if (!BYPASS_LOGIN) {
+    return false;
+  }
+  const expected = getBypassLoginUsername().trim().toLowerCase();
+  return username.trim().toLowerCase() === expected;
+}
+
+/** Test login for BYPASS_LOGIN_USERNAME — any password, no network. */
+export function createDevTestLoginUser(username: string): SessionUser {
+  const trimmed = username.trim();
+  return {
+    id: trimmed,
+    username: trimmed,
+    name: trimmed,
+    token: `dev-${trimmed}`,
+    portalCookie: null,
+    isDevTestLogin: true,
+  };
+}
+
+export function createBypassLoginUser(username: string): SessionUser {
+  const trimmed = username.trim() || 'junaid.tp3';
+  return {
+    id: 'bypass',
+    username: trimmed,
+    name: `${trimmed} (login bypass)`,
+    token: 'bypass',
+    portalCookie: null,
+    isBypassLogin: true,
+  };
 }
 
 export interface PenaltyCategory {
@@ -130,11 +176,14 @@ export function parseLegacyLoginResponse(payload: unknown, username: string): Se
 }
 
 export async function login(username: string, password: string): Promise<SessionUser> {
-  // if (USE_FAKE_API) { ... }
+  const trimmed = username.trim();
+  if (matchesDevTestLogin(trimmed)) {
+    return createDevTestLoginUser(trimmed);
+  }
 
   const url = getLoginUrl();
   const body = new URLSearchParams({
-    username: username.trim(),
+    username: trimmed,
     password,
   }).toString();
 
@@ -142,11 +191,18 @@ export async function login(username: string, password: string): Promise<Session
     console.log('[login] POST', url);
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-    body,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body,
+    });
+  } catch {
+    throw new Error(
+      'Cannot reach the login server. Check Wi‑Fi or mobile data. For testing, sign in as junaid.tp3 with any password.',
+    );
+  }
 
   const text = await res.text();
   let payload: unknown;
@@ -175,22 +231,52 @@ function encodeUserParam(name: string): string {
   return value;
 }
 
+interface SurveyApiErrorPayload {
+  IS_ERR?: string | number;
+  ERR?: string;
+  error?: string;
+}
+
+function appendSurveyApiQuery(baseUrl: string, params: Record<string, string>): string {
+  const key = generateSurveyApiKey();
+  const query = new URLSearchParams({key, ...params});
+  return `${baseUrl}?${query.toString()}`;
+}
+
+function parseSurveyListError(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const row = payload as SurveyApiErrorPayload;
+  if (String(row.IS_ERR ?? '') === '1') {
+    return row.ERR || 'Invalid Access';
+  }
+  if (typeof row.error === 'string' && row.error.trim()) {
+    return row.error;
+  }
+  return null;
+}
+
 /** Loads cases for CC survey (cc_application_list.php). */
 export async function fetchCaseList(officerName: string): Promise<CcCaseItem[]> {
   const baseUrl = getCcApplicationListUrl();
   const userParam = encodeUserParam(officerName);
   const url = userParam
-    ? `${baseUrl}?u=${encodeURIComponent(userParam)}`
-    : baseUrl;
+    ? appendSurveyApiQuery(baseUrl, {u: userParam})
+    : appendSurveyApiQuery(baseUrl, {});
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to load cases: ${text}`);
   }
 
-  const payload = (await res.json()) as CcCaseItem[] | {error?: string};
+  const payload = (await res.json()) as CcCaseItem[] | SurveyApiErrorPayload;
+  const listError = parseSurveyListError(payload);
+  if (listError) {
+    throw new Error(listError);
+  }
   if (!Array.isArray(payload)) {
-    throw new Error(typeof payload?.error === 'string' ? payload.error : 'Failed to load cases');
+    throw new Error('Failed to load cases');
   }
   return payload.filter(item => item?.id && item?.owc);
 }
@@ -203,15 +289,19 @@ export async function fetchViolationTypes(scope = 'residential'): Promise<Penalt
 
   const baseUrl = getViolationListUrl();
   const category = scopeToViolationCategory(scope);
-  const url = `${baseUrl}?category=${encodeURIComponent(category)}`;
+  const url = appendSurveyApiQuery(baseUrl, {category});
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`Failed to load violations: ${text}`);
   }
 
-  const payload = (await res.json()) as CcViolationListItem[] | {data?: CcViolationListItem[]};
-  const items = Array.isArray(payload) ? payload : payload.data || [];
+  const payload = (await res.json()) as CcViolationListItem[] | {data?: CcViolationListItem[]} | SurveyApiErrorPayload;
+  const listError = parseSurveyListError(payload);
+  if (listError) {
+    throw new Error(listError);
+  }
+  const items = Array.isArray(payload) ? payload : 'data' in payload && Array.isArray(payload.data) ? payload.data : [];
   return mapCcViolationList(items);
 }
 

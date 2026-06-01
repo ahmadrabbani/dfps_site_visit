@@ -39,13 +39,8 @@ export default function App() {
     (async () => {
       try {
         const session = await loadSession();
-        if (cancelled) {
-          return;
-        }
-        if (session) {
+        if (!cancelled) {
           setUser(session);
-        } else {
-          setUser(null);
         }
       } catch {
         if (!cancelled) {
@@ -63,6 +58,10 @@ export default function App() {
   }, []);
 
   const handleLogin = useCallback(async (u: SessionUser) => {
+    if (u.isBypassLogin) {
+      setUser(u);
+      return;
+    }
     try {
       await saveSession(u);
     } catch {
@@ -77,17 +76,13 @@ export default function App() {
     violationDraftRef.current = null;
   }, []);
 
-  const stackKey = !authReady ? 'splash' : user ? 'app' : 'auth';
+  if (!authReady) {
+    return <SplashScreen />;
+  }
 
   return (
-    <Stack.Navigator key={stackKey} screenOptions={{headerShown: false, animation: 'slide_from_right'}}>
-      {!authReady ? (
-        <Stack.Screen name={ROOT_ROUTES.Splash} component={SplashScreen} />
-      ) : !user ? (
-        <Stack.Screen name={ROOT_ROUTES.Login} options={{contentStyle: {flex: 1}}}>
-          {() => <LoginScreen onLogin={handleLogin} />}
-        </Stack.Screen>
-      ) : (
+    <Stack.Navigator screenOptions={{headerShown: false, animation: 'slide_from_right'}}>
+      {user ? (
         <Stack.Screen name={ROOT_ROUTES.Authenticated} options={{headerShown: false}}>
           {() => (
             <AuthenticatedFlow
@@ -98,6 +93,10 @@ export default function App() {
               onSignOut={handleSignOut}
             />
           )}
+        </Stack.Screen>
+      ) : (
+        <Stack.Screen name={ROOT_ROUTES.Login} options={{contentStyle: {flex: 1}}}>
+          {() => <LoginScreen onLogin={handleLogin} />}
         </Stack.Screen>
       )}
     </Stack.Navigator>

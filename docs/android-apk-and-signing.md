@@ -30,6 +30,18 @@ Gradle can skip rebundling when it thinks nothing changed, so `app-debug.apk` ma
 3. **Replace the install on the device:** `npm run apk:install` (same as `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`). Requires **`adb devices`** to show a device. Or uninstall first:  
    `adb uninstall com.ahmadrabbani1.dfpssitevisit`  
    then install again.
+
+### Clean reinstall (start from zero)
+
+Older builds used **Android Auto Backup** (`allowBackup=true`), which could restore login and saved visits after reinstall. Current builds disable backup and cloud/device transfer.
+
+To wipe everything on a phone:
+
+1. **Settings → Apps → DFPS Site Visit → Uninstall** (do not use “Remove” from the home screen only).
+2. Optional (USB debugging): `adb uninstall com.ahmadrabbani1.dfpssitevisit`
+3. Install the **new** APK built after the backup change (`npm run apk:release`).
+
+You should see the **login screen** and no saved session. If anything persists, clear **Google backup** for this app in system backup settings, then uninstall again.
 4. **APK vs Metro:** `npm run android` loads JS from Metro (live updates). A **standalone** debug APK embeds JS at **build** time — code changes require **rebuilding** the APK.
 
 If Metro cache misbehaves during dev: `npx react-native start --reset-cache`.

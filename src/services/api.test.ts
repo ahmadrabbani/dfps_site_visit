@@ -1,9 +1,52 @@
+jest.mock('../config/env', () => ({
+  BYPASS_LOGIN: true,
+  getBypassLoginUsername: () => 'junaid.tp3',
+  getLoginUrl: () => 'http://test.example/login.php',
+  getViolationListUrl: () => 'http://test.example/cc_violation_list.php',
+  getCcApplicationListUrl: () => 'http://test.example/cc_application_list.php',
+  getCcPortalSubmitUrl: () => 'http://test.example/conf_add.php',
+  getCcSurveyUrl: () => 'http://test.example/forward.php',
+  getSurveyApiSecret: () => 'secret',
+  USE_FAKE_API: false,
+}));
+
 import {
   buildPortalCcSurveyTextFields,
   parsePortalCcSubmitResponse,
 } from './portalCcSurvey';
-import {buildCcSurveyFormFields, mapCcViolationList, parseLegacyLoginResponse} from './api';
-import type {PendingVisitBase} from './storage';
+import {
+  createBypassLoginUser,
+  createDevTestLoginUser,
+  login,
+  mapCcViolationList,
+  matchesDevTestLogin,
+  parseLegacyLoginResponse,
+} from './api';import type {PendingVisitBase} from './storage';
+
+describe('dev test login', () => {
+  it('matches junaid.tp3 when bypass is enabled', () => {
+    expect(matchesDevTestLogin('junaid.tp3')).toBe(true);
+    expect(matchesDevTestLogin('JUNAID.TP3')).toBe(true);
+    expect(matchesDevTestLogin('admin')).toBe(false);
+  });
+
+  it('signs in junaid.tp3 with any password without network', async () => {
+    await expect(login('junaid.tp3', 'anything')).resolves.toEqual(createDevTestLoginUser('junaid.tp3'));
+  });
+});
+
+describe('createBypassLoginUser', () => {
+  it('builds a dev session for CC list API testing', () => {
+    expect(createBypassLoginUser('junaid.tp3')).toEqual({
+      id: 'bypass',
+      username: 'junaid.tp3',
+      name: 'junaid.tp3 (login bypass)',
+      token: 'bypass',
+      portalCookie: null,
+      isBypassLogin: true,
+    });
+  });
+});
 
 describe('parseLegacyLoginResponse', () => {
   it('accepts successful legacy login array', () => {

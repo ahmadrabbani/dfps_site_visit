@@ -15,6 +15,15 @@ export const CC_APPLICATION_LIST_URL_RAW = Config.CC_APPLICATION_LIST_URL ?? '';
 /** Legacy tbllogin script (full URL to login handler PHP). */
 export const LOGIN_URL_RAW = Config.LOGIN_URL ?? '';
 
+/** Shared secret for hourly survey API key (housingportal/add_completion_certificate_survey.php). */
+export const CC_SURVEY_API_SECRET_RAW = Config.CC_SURVEY_API_SECRET ?? '';
+
+/** Skip login screen and use BYPASS_LOGIN_USERNAME for CC list APIs (forms still hit real endpoints). */
+export const BYPASS_LOGIN_RAW = Config.BYPASS_LOGIN ?? '';
+
+/** Officer username for case list when BYPASS_LOGIN is true (default junaid.tp3). */
+export const BYPASS_LOGIN_USERNAME_RAW = Config.BYPASS_LOGIN_USERNAME ?? '';
+
 /**
  * Base URL for the PHP app (no trailing slash), e.g.
  * `https://example.com/dfps-site/public/index.php`
@@ -93,6 +102,14 @@ export function getLoginUrl(): string {
   return DEFAULT_LOGIN_URL;
 }
 
+const DEFAULT_SURVEY_API_SECRET = 'my_ultra_secret_passphrase';
+
+/** Hourly AES key secret — matches housing portal CC survey pages. */
+export function getSurveyApiSecret(): string {
+  const trimmed = (CC_SURVEY_API_SECRET_RAW || '').trim();
+  return trimmed || DEFAULT_SURVEY_API_SECRET;
+}
+
 /**
  * Fake API disabled — always uses live endpoints.
  * To re-enable mock mode, uncomment below and set USE_FAKE_API=true in `.env`.
@@ -103,3 +120,21 @@ export const USE_FAKE_API = false;
 //   typeof __DEV__ !== 'undefined' &&
 //   __DEV__ &&
 //   String(Config.USE_FAKE_API ?? '').toLowerCase().trim() === 'true';
+
+function envFlag(value: string): boolean {
+  return String(value ?? '').toLowerCase().trim() === 'true';
+}
+
+/**
+ * When true: `BYPASS_LOGIN_USERNAME` + any password signs in without calling the portal (dev testing).
+ * Login screen also shows an optional “test without login” shortcut.
+ */
+export const BYPASS_LOGIN = envFlag(BYPASS_LOGIN_RAW);
+
+const DEFAULT_BYPASS_USERNAME = 'junaid.tp3';
+
+/** Username passed to cc_application_list.php when login is bypassed. */
+export function getBypassLoginUsername(): string {
+  const trimmed = (BYPASS_LOGIN_USERNAME_RAW || '').trim();
+  return trimmed || DEFAULT_BYPASS_USERNAME;
+}
