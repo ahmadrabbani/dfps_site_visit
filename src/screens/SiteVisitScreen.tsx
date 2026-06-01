@@ -25,6 +25,7 @@ import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
 import {fetchCaseList, isTestModeSession, type SessionUser} from '../services/api';
+import {queryKeys} from '../queries/queryKeys';
 import type {SiteVisitViolation} from '../services/storage';
 import type {CcSurveyCompletePayload, SetViolations, SiteScope, ViolationChoice} from '../types/app';
 import {acquireDeviceCoords, isGpsPermissionError, isGpsSettingsError} from '../utils/deviceLocation';
@@ -51,6 +52,7 @@ interface SiteVisitScreenProps {
   onScopeChange: (scope: SiteScope) => void;
   onAddViolation: (currentViolations: SiteVisitViolation[], setViolations: SetViolations) => void;
   onCompleteVisit: (survey: CcSurveyCompletePayload) => void;
+  isSubmitting?: boolean;
 }
 
 export default function SiteVisitScreen({
@@ -60,6 +62,7 @@ export default function SiteVisitScreen({
   onScopeChange,
   onAddViolation,
   onCompleteVisit,
+  isSubmitting = false,
 }: SiteVisitScreenProps) {
   const [gpsAllowed, setGpsAllowed] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(Platform.OS !== 'android');
@@ -306,7 +309,7 @@ export default function SiteVisitScreen({
     error: casesError,
     refetch: refetchCases,
   } = useQuery({
-    queryKey: ['ccCases', user.username, siteScope],
+    queryKey: queryKeys.ccCases(user.username, siteScope),
     queryFn: () => fetchCaseList(user.username, siteScope),
     staleTime: 2 * 60 * 1000,
   });
@@ -536,20 +539,29 @@ export default function SiteVisitScreen({
       ) : null}
 
       <FormLabel title="Plot category" required>
-        <View style={styles.row}>
-          {scopes.map(scope => (
-            <TouchableOpacity
-              key={scope.value}
-              style={[
-                styles.chip,
-                scope.value === siteScope ? styles.chipActive : styles.chipInactive,
-              ]}
-              onPress={() => handleScopeChange(scope.value)}>
-              <Text style={[styles.chipText, scope.value === siteScope ? styles.chipTextActive : null]}>
-                {scope.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={formStyles.plotCategoryRow}>
+          {scopes.map(scope => {
+            const selected = scope.value === siteScope;
+            return (
+              <TouchableOpacity
+                key={scope.value}
+                accessibilityRole="button"
+                accessibilityState={{selected}}
+                style={[
+                  formStyles.plotCategoryChip,
+                  selected ? formStyles.plotCategoryChipActive : formStyles.plotCategoryChipInactive,
+                ]}
+                onPress={() => handleScopeChange(scope.value)}>
+                <Text
+                  style={[
+                    formStyles.plotCategoryChipText,
+                    selected ? formStyles.plotCategoryChipTextActive : null,
+                  ]}>
+                  {scope.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </FormLabel>
 
@@ -658,10 +670,15 @@ export default function SiteVisitScreen({
 
       {showViolationSection ? (
         <>
-          <View style={styles.sectionHeader}>
+          <View style={styles.violationsBlock}>
             <Text style={styles.sectionTitle}>Violations</Text>
-            <TouchableOpacity style={styles.addButton} onPress={handleAddViolation}>
-              <Text style={styles.addButtonText}>+ Add Violation</Text>
+            <TouchableOpacity
+              style={styles.addViolationBtn}
+              onPress={handleAddViolation}
+              accessibilityRole="button"
+              accessibilityLabel="Add violation">
+              <Icon source="plus-circle-outline" size={22} color="#ffffff" />
+              <Text style={styles.addViolationBtnText}>Add Violation</Text>
             </TouchableOpacity>
           </View>
           <Text style={styles.photoFlowHint}>
@@ -743,10 +760,18 @@ export default function SiteVisitScreen({
       ) : null}
 
       <TouchableOpacity
-        style={[styles.completeButton, canSave ? styles.completeButtonEnabled : styles.completeButtonDisabled]}
-        disabled={!canSave}
-        onPress={handleSaveSurvey}>
-        <Text style={styles.completeButtonText}>Save Survey</Text>
+        style={[
+          styles.completeButton,
+          canSave && !isSubmitting ? styles.completeButtonEnabled : styles.completeButtonDisabled,
+        ]}
+        disabled={!canSave || isSubmitting}
+        onPress={handleSaveSurvey}
+        accessibilityState={{disabled: !canSave || isSubmitting, busy: isSubmitting}}>
+        {isSubmitting ? (
+          <ActivityIndicator color="#ffffff" size="small" />
+        ) : (
+          <Text style={styles.completeButtonText}>Save Survey</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -944,18 +969,41 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   loaderRow: {flexDirection: 'row', alignItems: 'center', marginTop: 8},
-  sectionHeader: {marginTop: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'},
-  sectionTitle: {fontSize: 16, fontWeight: '700', color: colors.primary},
+  violationsBlock: {
+    marginTop: 16,
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+    marginBottom: 10,
+  },
+  addViolationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    minHeight: 48,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+  },
+  addViolationBtnText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   photoFlowHint: {
     fontSize: 12,
     lineHeight: 17,
     color: colors.mutedText,
     marginBottom: 12,
-    marginTop: 4,
+    marginTop: 12,
   },
   photoMeta: {fontSize: 12, color: colors.mutedText, marginTop: 8, lineHeight: 17},
-  addButton: {paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.primaryLight},
-  addButtonText: {color: '#ffffff', fontSize: 12},
   violationCard: {
     backgroundColor: colors.card,
     borderRadius: 10,

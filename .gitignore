@@ -68,6 +68,10 @@ node_modules/.generated/
 # Local AI / editor (machine-specific; not for repo)
 .claude/settings.local.json
 
+# Internal migration / planning markdown (local reference; not for repo)
+docs/tanstack-query-migration.md
+**/*.local.md
+
 # Reference PHP portal (managed separately; not part of the RN app)
 housingportal/
 

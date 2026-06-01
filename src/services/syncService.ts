@@ -9,6 +9,8 @@ import {
 } from './storage';
 import {pushSiteVisit} from './api';
 import {reportServiceError} from './errorReporting';
+import {invalidateVisitCaches} from '../queries/invalidateVisitCaches';
+import {appQueryClient} from '../queries/queryClient';
 
 let unsubscribe: (() => void) | null = null;
 const MAX_RETRIES = 6;
@@ -70,7 +72,12 @@ export interface SyncPendingResult {
   paused: number;
 }
 
-export async function syncPending(): Promise<SyncPendingResult> {
+export interface SyncPendingOptions {
+  /** Skip success/partial/fail toasts (e.g. submit mutation shows its own). */
+  skipNotifications?: boolean;
+}
+
+export async function syncPending(options?: SyncPendingOptions): Promise<SyncPendingResult> {
   const visits = await getPendingVisits();
   if (!visits.length) {
     return {uploaded: 0, failed: 0, deferred: 0, paused: 0};
@@ -114,12 +121,18 @@ export async function syncPending(): Promise<SyncPendingResult> {
     }
   }
 
-  if (uploaded > 0 && failed === 0) {
-    notifySyncSuccess(uploaded);
-  } else if (uploaded > 0 && failed > 0) {
-    notifySyncPartial(uploaded, failed);
-  } else if (uploaded === 0 && failed > 0) {
-    notifySyncAllFailed(failed);
+  if (!options?.skipNotifications) {
+    if (uploaded > 0 && failed === 0) {
+      notifySyncSuccess(uploaded);
+    } else if (uploaded > 0 && failed > 0) {
+      notifySyncPartial(uploaded, failed);
+    } else if (uploaded === 0 && failed > 0) {
+      notifySyncAllFailed(failed);
+    }
+  }
+
+  if (uploaded > 0 || failed > 0) {
+    invalidateVisitCaches(appQueryClient, {serverPushSucceeded: uploaded > 0});
   }
 
   return {uploaded, failed, deferred, paused};

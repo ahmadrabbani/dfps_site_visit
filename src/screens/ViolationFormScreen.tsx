@@ -23,6 +23,7 @@ import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
 import {CC_FLOOR_OPTIONS, CC_UNITS, CC_VIOLATION_REMARKS_MAX} from '../constants/ccSurvey';
+import {queryKeys} from '../queries/queryKeys';
 import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
 import {notifySuccess} from '../utils/notify';
 import type {SiteVisitViolation} from '../services/storage';
@@ -78,7 +79,7 @@ export default function ViolationFormScreen({
     error,
     refetch,
   } = useQuery({
-    queryKey: ['violationTypes', scope],
+    queryKey: queryKeys.violationTypes(scope),
     queryFn: () => fetchViolationTypes(scope),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -204,20 +205,29 @@ export default function ViolationFormScreen({
         <Text style={styles.header}>Add violation</Text>
 
         <FormLabel title="Plot category" first>
-          <View style={styles.chipRow}>
-            {scopes.map(option => (
-              <TouchableOpacity
-                key={option.value}
-                style={[
-                  styles.chip,
-                  option.value === scope ? styles.chipActive : styles.chipInactive,
-                ]}
-                onPress={() => onScopeChange(option.value)}>
-                <Text style={[styles.chipText, option.value === scope ? styles.chipTextActive : null]}>
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={formStyles.plotCategoryRow}>
+            {scopes.map(option => {
+              const selected = option.value === scope;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  accessibilityRole="button"
+                  accessibilityState={{selected}}
+                  style={[
+                    formStyles.plotCategoryChip,
+                    selected ? formStyles.plotCategoryChipActive : formStyles.plotCategoryChipInactive,
+                  ]}
+                  onPress={() => onScopeChange(option.value)}>
+                  <Text
+                    style={[
+                      formStyles.plotCategoryChipText,
+                      selected ? formStyles.plotCategoryChipTextActive : null,
+                    ]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </FormLabel>
 

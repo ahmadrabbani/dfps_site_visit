@@ -8,19 +8,16 @@ import {AuthNavigationProvider, useAuthNavigation} from './AuthNavigationContext
 import {MainStackDrawerHost, useDrawerInteraction} from './DrawerInteractionContext';
 import AppDrawerContent from '../components/AppDrawerContent';
 import AppHeader from '../components/AppHeader';
-import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
 import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
 import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
-import {addPendingVisit} from '../services/storage';
-import {syncPending} from '../services/syncService';
-import {notifySuccess} from '../utils/notify';
+import {useSubmitSiteVisitMutation} from '../hooks/useSubmitSiteVisitMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
-import type {AuthNavigationContextValue, CcSurveyCompletePayload, SiteScope, ViolationDraft} from '../types/app';
+import type {AuthNavigationContextValue, SiteScope, ViolationDraft} from '../types/app';
 import type {SessionUser} from '../services/api';
 
 const Drawer = createDrawerNavigator();
@@ -67,57 +64,22 @@ function SiteVisitRouteScreen() {
   const route = useRoute<any>();
   const {user, siteScope, setSiteScope, violationDraftRef} = useAuthNavigation();
   const locationPrepared = route.params?.locationPrepared === true;
+  const submitVisit = useSubmitSiteVisitMutation(navigation);
+
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <SiteVisitScreen
         user={user}
         siteScope={siteScope}
         locationPrepared={locationPrepared}
+        isSubmitting={submitVisit.isPending}
         onScopeChange={setSiteScope}
         onAddViolation={(currentViolations, setViolations) => {
           violationDraftRef.current = {currentViolations, setViolations};
           navigation.navigate(MAIN_STACK_ROUTES.ViolationForm);
         }}
-        onCompleteVisit={async (survey: CcSurveyCompletePayload) => {
-          const now = new Date().toISOString();
-          const visit = {
-            localId: 'local-' + Date.now(),
-            siteId: 1,
-            caseId: survey.caseId,
-            caseNumber: survey.caseLabel,
-            officerId: user.id,
-            visitByName: user.name,
-            authToken: user.token,
-            startTime: now,
-            endTime: now,
-            startLat: survey.coords.lat,
-            startLon: survey.coords.lng,
-            scope: survey.scope,
-            isViolation: survey.isViolation,
-            noOfFloors: survey.noOfFloors,
-            remarks: survey.remarks,
-            mainImageUri: survey.mainImageUri,
-            violations: survey.violations,
-          };
-          await addPendingVisit(visit);
-          let uploadedToApi = false;
-          let uploadError: string | null = null;
-          try {
-            const syncResult = await syncPending();
-            uploadedToApi = syncResult.uploaded > 0;
-            if (uploadedToApi) {
-              notifySuccess(uploadCopy.pushedToServer);
-            } else if (syncResult.failed > 0) {
-              uploadError = uploadCopy.uploadFailedRetry;
-              notifySuccess(uploadCopy.savedPushFromSubmissions);
-            } else {
-              notifySuccess(uploadCopy.savedPushFromSubmissions);
-            }
-          } catch (e) {
-            uploadError = (e as Error).message;
-            notifySuccess(uploadCopy.savedPushFromSubmissions);
-          }
-          navigation.navigate(MAIN_STACK_ROUTES.Summary, {visit, uploadedToApi, uploadError});
+        onCompleteVisit={survey => {
+          submitVisit.mutate({user, survey});
         }}
       />
     </SafeAreaView>
@@ -235,12 +197,12 @@ export default function AuthenticatedFlow({
           swipeEnabled: true,
           overlayColor: 'rgba(0, 51, 102, 0.45)',
           drawerStyle: {
-            width: '86%',
-            maxWidth: 320,
+            width: '81%',
+            maxWidth: 290,
             backgroundColor: '#ffffff',
             marginBottom: 12,
             borderBottomRightRadius: 16,
-            borderTopRightRadius: 0,
+            borderTopRightRadius: 4,
           },
           sceneContainerStyle: {backgroundColor: colors.background},
         }}>

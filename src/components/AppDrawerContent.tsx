@@ -13,8 +13,8 @@ import {useAuthNavigation} from '../navigation/AuthNavigationContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import {colors} from '../theme/colors';
 import {getAppHeaderHeight} from '../theme/screenLayout';
-import {getPendingVisits} from '../services/storage';
-import {syncPending} from '../services/syncService';
+import {usePendingVisitCount, usePendingVisitsQuery} from '../hooks/usePendingVisitsQuery';
+import {useSyncPendingMutation} from '../hooks/useSyncPendingMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
 import ConnectionStatusDot from './ConnectionStatusDot';
 
@@ -67,47 +67,28 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
   const netInfo = useNetInfo();
   const isOnline = !!netInfo.isConnected;
 
-  const [pendingCount, setPendingCount] = useState(0);
-  const [syncing, setSyncing] = useState(false);
   const [menuNavigating, setMenuNavigating] = useState(false);
+  const pendingCount = usePendingVisitCount();
+  const syncMutation = useSyncPendingMutation();
   const menuNavigatingRef = useRef(false);
 
   const activeRoute = useMemo(() => getActiveStackRouteName(state), [state]);
   const topBarHeight = getAppHeaderHeight(insets.top);
 
-  const fetchPendingCount = useCallback(async () => {
-    try {
-      const visits = await getPendingVisits();
-      setPendingCount(visits.length);
-    } catch {
-      setPendingCount(0);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchPendingCount();
-  }, [fetchPendingCount]);
+  const {refetch: refetchPending} = usePendingVisitsQuery();
 
   useEffect(() => {
     if (drawerStatus === 'open') {
-      fetchPendingCount();
+      void refetchPending();
     }
-  }, [drawerStatus, fetchPendingCount]);
+  }, [drawerStatus, refetchPending]);
 
-  const handleSync = useCallback(async () => {
-    if (syncing || !isOnline) {
+  const handleSync = useCallback(() => {
+    if (syncMutation.isPending || !isOnline) {
       return;
     }
-    setSyncing(true);
-    try {
-      await syncPending();
-    } catch (e) {
-      // Errors are already logged and alerted inside syncPending
-    } finally {
-      await fetchPendingCount();
-      setSyncing(false);
-    }
-  }, [syncing, isOnline, fetchPendingCount]);
+    syncMutation.mutate();
+  }, [isOnline, syncMutation]);
 
   const navigateTo = useCallback(
     async (screen: string) => {
@@ -152,7 +133,7 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
       <View style={[styles.topBarSpacer, {height: topBarHeight}]} />
 
       <View style={styles.drawerBody}>
-        <View style={styles.profileSection}>
+        <View style={styles.header}>
           <View style={styles.brandRow}>
             <View style={styles.brandIconWrap}>
               <Image source={ldaLogo} style={styles.brandLogo} resizeMode="contain" />
@@ -165,14 +146,14 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
 
           <View style={styles.userCard}>
             <View style={styles.userAvatar}>
-              <Icon source="account" size={28} color={colors.primary} />
+              <Icon source="account" size={26} color={colors.primary} />
             </View>
             <View style={styles.userMeta}>
               <Text style={styles.userName} numberOfLines={1}>
                 {user.name}
               </Text>
               <View style={styles.statusRow}>
-                <ConnectionStatusDot size={9} />
+                <ConnectionStatusDot size={8} variant="onPrimary" />
                 <Text style={styles.statusText}>
                   {isOnline ? 'Online' : 'Offline Mode'}
                 </Text>
@@ -181,57 +162,69 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
           </View>
         </View>
 
-      <DrawerContentScrollView
+        <DrawerContentScrollView
         {...props}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
         <Text style={styles.sectionLabel}>Menu</Text>
+        {pendingCount > 0 ? (
+          <View style={styles.pendingAlert}>
+            <View style={styles.pendingDot} />
+            <Text style={styles.pendingAlertText}>
+              {pendingCount} {pendingCount === 1 ? 'visit' : 'visits'} not uploaded yet
+            </Text>
+          </View>
+        ) : null}
 
-        {MENU_ITEMS.map(item => {
+        {MENU_ITEMS.map((item, index) => {
           const active = activeRoute === item.route;
           const isMySubmissions = item.route === MAIN_STACK_ROUTES.MySubmissions;
+          const isLast = index === MENU_ITEMS.length - 1;
           return (
-            <Pressable
-              key={item.route}
-              disabled={menuNavigating || syncing}
-              accessibilityRole="button"
-              accessibilityState={{selected: active, disabled: menuNavigating || syncing}}
-              onPress={() => void navigateTo(item.route)}
-              style={({pressed}) => [
-                styles.menuItem,
-                active ? styles.menuItemActive : null,
-                pressed && !active ? styles.menuItemPressed : null,
-              ]}>
-              <View style={styles.menuItemTopRow}>
-                <View style={styles.menuItemLabelContainer}>
-                  <Icon
-                    source={item.icon}
-                    size={26}
-                    color={active ? colors.primary : colors.primaryLight}
-                  />
-                  <Text style={[styles.menuLabel, active ? styles.menuLabelActive : null]}>
-                    {item.label}
-                  </Text>
-                </View>
-                {isMySubmissions && pendingCount > 0 ? (
-                  <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{pendingCount}</Text>
+            <View key={item.route}>
+              <Pressable
+                disabled={menuNavigating || syncMutation.isPending}
+                accessibilityRole="button"
+                accessibilityState={{selected: active, disabled: menuNavigating || syncMutation.isPending}}
+                onPress={() => void navigateTo(item.route)}
+                style={({pressed}) => [
+                  styles.menuItem,
+                  active ? styles.menuItemActive : null,
+                  isMySubmissions && pendingCount > 0 ? styles.menuItemPending : null,
+                  pressed && !active ? styles.menuItemPressed : null,
+                ]}>
+                <View style={styles.menuItemTopRow}>
+                  <View style={styles.menuItemLabelContainer}>
+                    <Icon
+                      source={item.icon}
+                      size={22}
+                      color={active ? colors.primary : colors.primaryLight}
+                    />
+                    <Text style={[styles.menuLabel, active ? styles.menuLabelActive : null]}>
+                      {item.label}
+                    </Text>
                   </View>
-                ) : null}
-              </View>
-              <Text style={styles.menuSubtitle} numberOfLines={2}>
-                {item.subtitle}
-              </Text>
-              {active ? <View style={styles.activeBar} /> : null}
-            </Pressable>
+                  {isMySubmissions && pendingCount > 0 ? (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{pendingCount}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={styles.menuSubtitle} numberOfLines={2}>
+                  {item.subtitle}
+                </Text>
+                {active ? <View style={styles.activeBar} /> : null}
+              </Pressable>
+              {!isLast ? <View style={styles.menuDivider} /> : null}
+            </View>
           );
         })}
-      </DrawerContentScrollView>
+        </DrawerContentScrollView>
 
       <View style={[styles.footer, {paddingBottom: Math.max(insets.bottom, 16)}]}>
         {pendingCount > 0 ? (
-          <View style={styles.syncCard}>
+          <View style={[styles.syncCard, styles.syncCardPending]}>
             <View style={styles.syncCardMeta}>
               <Icon source="cloud-sync-outline" size={22} color="#b45309" />
               <View style={styles.syncCardText}>
@@ -244,14 +237,14 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
               </View>
             </View>
             <Pressable
-              disabled={syncing || !isOnline}
+              disabled={syncMutation.isPending || !isOnline}
               onPress={handleSync}
               style={({pressed}) => [
                 styles.syncButton,
                 !isOnline ? styles.syncButtonDisabled : null,
                 pressed && isOnline ? styles.syncButtonPressed : null,
               ]}>
-              {syncing ? (
+              {syncMutation.isPending ? (
                 <ActivityIndicator size="small" color="#ffffff" />
               ) : (
                 <Text style={styles.syncButtonText}>Sync</Text>
@@ -266,10 +259,10 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
           accessibilityLabel="Sign out"
           onPress={handleSignOut}
           style={({pressed}) => [styles.signOutButton, pressed ? styles.signOutPressed : null]}>
-          <Icon source="logout" size={20} color={colors.danger} />
+          <Icon source="logout" size={20} color="#ffffff" />
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
-        <Text style={styles.footerVersion}>Site visit · v1.0</Text>
+        <Text style={styles.footerBrand}>DFPS Site Visit</Text>
       </View>
       </View>
     </View>
@@ -290,18 +283,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  profileSection: {
+  header: {
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#f8fafc',
+    paddingTop: 16,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   brandIconWrap: {
     width: 48,
@@ -320,32 +318,32 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   brandTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
-    color: colors.primary,
-    letterSpacing: 0.3,
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
   brandSubtitle: {
-    fontSize: 13,
-    color: colors.mutedText,
-    marginTop: 3,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.82)',
+    marginTop: 2,
     fontWeight: '500',
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   userAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e8f0f8',
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -354,9 +352,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: colors.text,
+    color: '#ffffff',
   },
   statusRow: {
     flexDirection: 'row',
@@ -365,39 +363,72 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusText: {
-    fontSize: 12,
-    color: colors.mutedText,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
     fontWeight: '600',
   },
   scroll: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 24,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 8,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.mutedText,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    marginLeft: 4,
-    marginBottom: 16,
+    marginLeft: 8,
+    marginBottom: 10,
   },
   menuItem: {
     flexDirection: 'column',
     alignItems: 'flex-start',
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    marginBottom: 22,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     position: 'relative',
     overflow: 'hidden',
   },
+  menuDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#e5e7eb',
+    marginHorizontal: 14,
+  },
   menuItemActive: {
     backgroundColor: '#e8f0f8',
+  },
+  menuItemPending: {
+    borderWidth: 2,
+    borderColor: colors.danger,
+  },
+  pendingAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginBottom: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  pendingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.danger,
+    marginRight: 8,
+  },
+  pendingAlertText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.danger,
   },
   menuItemPressed: {
     backgroundColor: '#f3f4f6',
@@ -407,17 +438,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   menuItemLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 10,
     flex: 1,
     paddingRight: 8,
   },
   menuLabel: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
     color: colors.text,
     flexShrink: 1,
@@ -427,16 +458,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   menuSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.mutedText,
-    marginLeft: 40,
-    lineHeight: 20,
+    marginLeft: 32,
+    lineHeight: 17,
   },
   activeBar: {
     position: 'absolute',
     left: 0,
-    top: 16,
-    bottom: 16,
+    top: 12,
+    bottom: 12,
     width: 4,
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
@@ -461,6 +492,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 4,
     backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
   syncCard: {
     flexDirection: 'row',
@@ -472,6 +504,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#fef3c7',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  syncCardPending: {
+    borderColor: '#fecaca',
+    borderWidth: 1.5,
   },
   syncCardMeta: {
     flexDirection: 'row',
@@ -517,30 +555,34 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#e5e7eb',
     marginBottom: 12,
+    alignSelf: 'stretch',
+    width: '100%',
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    alignSelf: 'stretch',
+    width: '100%',
     paddingVertical: 12,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#fecaca',
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.primary,
     gap: 8,
   },
   signOutPressed: {
-    opacity: 0.85,
+    opacity: 0.88,
   },
   signOutText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.danger,
+    color: '#ffffff',
   },
-  footerVersion: {
-    fontSize: 11,
-    color: colors.mutedText,
+  footerBrand: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 12,
+    letterSpacing: 0.3,
   },
 });

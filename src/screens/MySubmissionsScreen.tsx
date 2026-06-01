@@ -41,6 +41,7 @@ function SubmissionCard({
   actionLabel,
   onAction,
   actionDisabled,
+  notSubmitted,
 }: {
   title: string;
   subtitle: string;
@@ -52,12 +53,14 @@ function SubmissionCard({
   actionLabel?: string;
   onAction?: () => void;
   actionDisabled?: boolean;
+  /** Red border — saved on device, not on server yet. */
+  notSubmitted?: boolean;
 }) {
   const statusColor =
     statusTone === 'success' ? colors.success : statusTone === 'warning' ? colors.danger : colors.mutedText;
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, notSubmitted ? styles.cardNotSubmitted : null]}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{title}</Text>
         <Text style={[styles.statusBadge, {color: statusColor}]}>{status}</Text>
@@ -221,6 +224,7 @@ export default function MySubmissionsScreen() {
         pending.map(item => (
           <SubmissionCard
             key={item.localId}
+            notSubmitted
             title={item.caseNumber || `Case ${item.caseId}`}
             subtitle={`${item.scope || 'Survey'} · ${item.isViolation ? 'Violation' : 'No violation'}`}
             meta={[
@@ -230,8 +234,8 @@ export default function MySubmissionsScreen() {
                 : 'Ready to send to server',
             ].filter(Boolean)}
             apiFields={formatForwardCcSurveyPreview(item)}
-            status={item.paused ? 'Failed' : 'Pending'}
-            statusTone={item.paused ? 'warning' : 'muted'}
+            status={item.paused ? 'Failed' : 'Not on server'}
+            statusTone={item.paused ? 'warning' : 'warning'}
             imageUri={item.mainImageUri}
             actionLabel={pushingId === item.localId ? uploadCopy.pushingOne : uploadCopy.pushOneNow}
             onAction={() => handlePushOne(item.localId)}
@@ -280,6 +284,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+  },
+  cardNotSubmitted: {
+    borderWidth: 2,
+    borderColor: colors.danger,
+    backgroundColor: '#fffbfb',
   },
   cardHeader: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'},
   cardTitle: {flex: 1, fontWeight: '700', color: colors.text, fontSize: 14, paddingRight: 8},

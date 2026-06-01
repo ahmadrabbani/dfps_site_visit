@@ -43,4 +43,31 @@ export const formStyles = StyleSheet.create({
     minHeight: 72,
     textAlignVertical: 'top',
   },
+  plotCategoryRow: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  plotCategoryChip: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plotCategoryChipActive: {
+    backgroundColor: colors.primary,
+  },
+  plotCategoryChipInactive: {
+    backgroundColor: '#e5e7eb',
+  },
+  plotCategoryChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  plotCategoryChipTextActive: {
+    color: '#ffffff',
+  },
 });

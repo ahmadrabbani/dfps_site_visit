@@ -64,10 +64,10 @@ export default function AppHeader({navigation, routeName}: AppHeaderProps) {
         <Appbar.Content
           title={
             <View style={styles.centerTitle}>
-              <ConnectionStatusDot size={12} />
               <Text style={styles.title} numberOfLines={1}>
                 {title}
               </Text>
+              <ConnectionStatusDot size={10} variant="onPrimary" />
             </View>
           }
         />
@@ -89,15 +89,17 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.2)',
   },
   centerTitle: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 10,
     maxWidth: '100%',
+    paddingHorizontal: 4,
   },
   title: {
     color: '#ffffff',
     fontWeight: '600',
     fontSize: 17,
-    textAlign: 'center',
+    flexShrink: 1,
   },
 });

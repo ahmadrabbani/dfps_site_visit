@@ -1,11 +1,11 @@
-import React, {useEffect, useState} from 'react';
+import React from 'react';
 import {View, Text, TouchableOpacity, StyleSheet, ScrollView} from 'react-native';
 import {Icon} from 'react-native-paper';
-import {useIsFocused, useNavigation} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import {isTestModeSession, type SessionUser} from '../services/api';
 import {colors} from '../theme/colors';
 import {SCREEN_TOP_INSET} from '../theme/screenLayout';
-import {getPendingVisits} from '../services/storage';
+import {usePendingVisitCount} from '../hooks/usePendingVisitsQuery';
 import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import FadeInView from '../components/animated/FadeInView';
 interface DashboardScreenProps {
@@ -15,21 +15,8 @@ interface DashboardScreenProps {
 }
 
 export default function DashboardScreen({user, onStartVisit, startingVisit = false}: DashboardScreenProps) {
-  const isFocused = useIsFocused();
   const navigation = useNavigation<any>();
-  const [pendingCount, setPendingCount] = useState(0);
-
-  useEffect(() => {
-    if (isFocused) {
-      getPendingVisits()
-        .then(visits => {
-          setPendingCount(visits.length);
-        })
-        .catch(() => {
-          setPendingCount(0);
-        });
-    }
-  }, [isFocused]);
+  const pendingCount = usePendingVisitCount();
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -48,13 +35,15 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
       {pendingCount > 0 ? (
         <FadeInView delay={60}>
         <TouchableOpacity
-          style={styles.pendingBar}
+          className="flex-row items-center bg-[#dc2626] py-3.5 px-4 rounded-2xl mb-6 justify-between shadow-md"
           onPress={() => navigation.navigate(MAIN_STACK_ROUTES.MySubmissions)}
           accessibilityRole="button"
           accessibilityLabel={`You have ${pendingCount} unpushed violations. Tap to view.`}>
-          <View style={styles.pendingBarLeft}>
-            <Icon source="alert-circle-outline" size={22} color="#ffffff" />
-            <Text style={styles.pendingBarText}>
+          <View className="flex-row items-center flex-1">
+            <View className="animate-pulse mr-2.5">
+              <Icon source="alert-circle-outline" size={22} color="#ffffff" />
+            </View>
+            <Text className="text-white text-[14px] font-bold flex-1">
               View {pendingCount} unpushed {pendingCount === 1 ? 'violation' : 'violations'}
             </Text>
           </View>
@@ -118,14 +107,16 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
       </FadeInView>
 
       {/* Navigation Drawer Swipe Hint */}
-      <View style={styles.drawerHintCard}>
-        <Icon source="gesture-swipe-right" size={20} color={colors.primary} />
-        <Text style={styles.drawerHintText}>
+      <View className="flex-row items-center bg-[#e8f0f8] rounded-xl p-3 mt-4 border border-[#d0e1f9]">
+        <View className="animate-pulse mr-2.5">
+          <Icon source="gesture-swipe-right" size={20} color={colors.primary} />
+        </View>
+        <Text className="flex-1 text-[12px] text-[#003366] font-medium leading-relaxed">
           Tip: Swipe from the left edge of the screen or tap the menu icon (☰) at the top-left to open the navigation drawer.
         </Text>
       </View>
 
-      <Text style={styles.helperText}>
+      <Text className="text-center mt-7 text-[12px] text-[#6b7280] leading-relaxed">
         Enable GPS on DFPS Site Visit to save a survey. Unsent visits stay on this device until you push
         them to the server from My Site Visits & Submissions.
       </Text>
@@ -181,33 +172,7 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     marginTop: 2,
   },
-  pendingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#dc2626',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    marginBottom: 24,
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  pendingBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  pendingBarText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '700',
-    marginLeft: 10,
-    flex: 1,
-  },
+
   bypassBanner: {
     backgroundColor: '#fff8e6',
     borderColor: '#f0c040',
@@ -277,29 +242,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 16,
   },
-  helperText: {
-    textAlign: 'center',
-    marginTop: 28,
-    fontSize: 12,
-    color: colors.mutedText,
-    lineHeight: 16,
-  },
-  drawerHintCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e8f0f8',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 18,
-    borderWidth: 1,
-    borderColor: '#d0e1f9',
-  },
-  drawerHintText: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.primary,
-    marginLeft: 10,
-    lineHeight: 16,
-    fontWeight: '500',
-  },
+
 });

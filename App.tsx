@@ -22,20 +22,13 @@ import {StyleSheet} from 'react-native';
 import type {LinkingOptions, ParamListBase} from '@react-navigation/native';
 import PersistedNavigation from './src/navigation/PersistedNavigation';
 import ToastProvider from './src/components/toast/ToastProvider';
-import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
+import {QueryClientProvider} from '@tanstack/react-query';
+import {appQueryClient} from './src/queries/queryClient';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {MD3LightTheme, PaperProvider} from 'react-native-paper';
 import App from './src/App';
 import {linking} from './src/navigation/linking';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-    },
-  },
-});
 
 const appTheme = {
   ...MD3LightTheme,
@@ -51,7 +44,7 @@ const appLinking = linking as LinkingOptions<ParamListBase>;
 export default function Root() {
   return (
     <GestureHandlerRootView style={styles.root}>
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={appQueryClient}>
         <PaperProvider theme={appTheme}>
           <SafeAreaProvider>
             <ToastProvider>
