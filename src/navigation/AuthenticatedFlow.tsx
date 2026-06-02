@@ -16,6 +16,8 @@ import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 import {useSubmitSiteVisitMutation} from '../hooks/useSubmitSiteVisitMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
+import AppTourModal from '../components/AppTourModal';
+import {AppTourProvider} from '../context/AppTourContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
 import type {AuthNavigationContextValue, SiteScope, ViolationDraft} from '../types/app';
 import type {SessionUser} from '../services/api';
@@ -93,7 +95,6 @@ function ViolationFormRouteScreen() {
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <ViolationFormScreen
         scope={siteScope}
-        onScopeChange={setSiteScope}
         onSave={violation => {
           const draft = violationDraftRef.current;
           if (draft) {
@@ -188,26 +189,29 @@ export default function AuthenticatedFlow({
 
   return (
     <AuthNavigationProvider value={value}>
-      <Drawer.Navigator
-        drawerContent={props => <AppDrawerContent {...props} />}
-        screenOptions={{
-          headerShown: false,
-          drawerPosition: 'left',
-          drawerType: 'front',
-          swipeEnabled: true,
-          overlayColor: 'rgba(0, 51, 102, 0.45)',
-          drawerStyle: {
-            width: '81%',
-            maxWidth: 290,
-            backgroundColor: '#ffffff',
-            marginBottom: 12,
-            borderBottomRightRadius: 16,
-            borderTopRightRadius: 4,
-          },
-          sceneContainerStyle: {backgroundColor: colors.background},
-        }}>
-        <Drawer.Screen name={DRAWER_ROUTES.Main} component={MainDrawerScreen} options={{title: 'Menu'}} />
-      </Drawer.Navigator>
+      <AppTourProvider username={user.username}>
+        <Drawer.Navigator
+          drawerContent={props => <AppDrawerContent {...props} />}
+          screenOptions={{
+            headerShown: false,
+            drawerPosition: 'left',
+            drawerType: 'front',
+            swipeEnabled: true,
+            overlayColor: 'rgba(0, 51, 102, 0.45)',
+            drawerStyle: {
+              width: '81%',
+              maxWidth: 290,
+              backgroundColor: '#ffffff',
+              marginBottom: 12,
+              borderBottomRightRadius: 16,
+              borderTopRightRadius: 4,
+            },
+            sceneContainerStyle: {backgroundColor: colors.background},
+          }}>
+          <Drawer.Screen name={DRAWER_ROUTES.Main} component={MainDrawerScreen} options={{title: 'Menu'}} />
+        </Drawer.Navigator>
+        <AppTourModal />
+      </AppTourProvider>
     </AuthNavigationProvider>
   );
 }

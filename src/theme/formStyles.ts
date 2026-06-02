@@ -1,16 +1,17 @@
 import {StyleSheet} from 'react-native';
 import {colors} from './colors';
+import {glassStyles} from './glassStyles';
 
 /** Shared form label + field spacing for survey screens. */
 export const formStyles = StyleSheet.create({
   group: {
-    marginTop: 22,
+    marginTop: 18,
   },
   groupFirst: {
     marginTop: 10,
   },
   groupCompact: {
-    marginTop: 14,
+    marginTop: 12,
   },
   labelSpacing: {
     marginBottom: 10,
@@ -26,13 +27,14 @@ export const formStyles = StyleSheet.create({
     fontWeight: '600',
   },
   requiredMark: {
-    color: colors.danger,
-    fontWeight: '700',
+    color: colors.mutedText,
+    fontWeight: '600',
+    fontSize: 13,
   },
   hint: {
     fontSize: 12,
     lineHeight: 18,
-    color: colors.mutedText,
+    color: colors.hintText,
     marginTop: -2,
     marginBottom: 8,
   },
@@ -60,7 +62,7 @@ export const formStyles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   plotCategoryChipInactive: {
-    backgroundColor: '#e5e7eb',
+    ...glassStyles.chip,
   },
   plotCategoryChipText: {
     fontSize: 14,

@@ -24,7 +24,7 @@ import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
-import {fetchCaseList, isTestModeSession, type SessionUser} from '../services/api';
+import {fetchCaseList, type SessionUser} from '../services/api';
 import {queryKeys} from '../queries/queryKeys';
 import type {SiteVisitViolation} from '../services/storage';
 import type {CcSurveyCompletePayload, SetViolations, SiteScope, ViolationChoice} from '../types/app';
@@ -86,7 +86,6 @@ export default function SiteVisitScreen({
   const screenFocusedRef = useRef(false);
   const awaitingReturnRef = useRef(false);
   const permissionDialogOpenRef = useRef(false);
-  const allowTestGpsFallback = isTestModeSession(user);
   const locationPreparedRef = useRef(locationPrepared);
 
   const androidPostPermissionDelay = () =>
@@ -210,11 +209,6 @@ export default function SiteVisitScreen({
     },
     [runGpsFetch],
   );
-
-  const useTestGpsFallback = useCallback(() => {
-    applyCoords(31.5204, 74.3587);
-    notifyInfo('Using test GPS coordinates (Lahore).');
-  }, [applyCoords]);
 
   const handleOpenLocationSettings = useCallback(() => {
     awaitingReturnRef.current = true;
@@ -462,7 +456,7 @@ export default function SiteVisitScreen({
           Officer: <Text style={styles.officerName}>{user.name}</Text>
         </Text>
       </View>
-      <FormLabel title="Current Location" required first>
+      <View style={styles.locationSection}>
         <View style={styles.locationCard}>
           <View style={styles.locationCardHeader}>
             <Icon
@@ -522,17 +516,10 @@ export default function SiteVisitScreen({
                   <Text style={styles.locationSettingsBtnText}>Open Settings</Text>
                 </TouchableOpacity>
               ) : null}
-              {allowTestGpsFallback ? (
-                <TouchableOpacity
-                  style={styles.locationSettingsBtn}
-                  onPress={useTestGpsFallback}>
-                  <Text style={styles.locationSettingsBtnText}>Use test GPS</Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
           ) : null}
         </View>
-      </FormLabel>
+      </View>
 
       {showTestGpsControls ? (
         <Text style={styles.siteInfo}>Test mode active (fake API enabled).</Text>
@@ -780,6 +767,7 @@ export default function SiteVisitScreen({
 const styles = StyleSheet.create({
   container: {
     ...screenContentPadding(16, 24),
+    paddingTop: 14,
     backgroundColor: colors.background,
     flexGrow: 1,
   },
@@ -804,6 +792,9 @@ const styles = StyleSheet.create({
   officerName: {
     fontWeight: '800',
     color: colors.primary,
+  },
+  locationSection: {
+    marginTop: 10,
   },
   locationCard: {
     backgroundColor: '#ffffff',

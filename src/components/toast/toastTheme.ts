@@ -1,5 +1,10 @@
 import type {ToastVariant} from './toastController';
 
+/** All in-app toasts anchor to the bottom safe area. */
+export const TOAST_POSITION = 'bottom' as const;
+
+export const TOAST_BOTTOM_OFFSET = 12;
+
 export const TOAST_DURATION_MS: Record<ToastVariant, number> = {
   info: 3200,
   success: 3000,

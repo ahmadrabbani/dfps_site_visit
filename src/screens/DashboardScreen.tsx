@@ -4,10 +4,21 @@ import {Icon} from 'react-native-paper';
 import {useNavigation} from '@react-navigation/native';
 import {isTestModeSession, type SessionUser} from '../services/api';
 import {colors} from '../theme/colors';
+import {glass, glassStyles} from '../theme/glassStyles';
 import {SCREEN_TOP_INSET} from '../theme/screenLayout';
 import {usePendingVisitCount} from '../hooks/usePendingVisitsQuery';
 import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import FadeInView from '../components/animated/FadeInView';
+
+function CardChevron({variant = 'default'}: {variant?: 'default' | 'onDark'}) {
+  const onDark = variant === 'onDark';
+  return (
+    <View style={[styles.cardChevron, onDark ? styles.cardChevronOnDark : null]}>
+      <Icon source="chevron-right" size={24} color={onDark ? '#ffffff' : colors.primary} />
+    </View>
+  );
+}
+
 interface DashboardScreenProps {
   user: SessionUser;
   onStartVisit: () => void;
@@ -47,7 +58,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
               View {pendingCount} unpushed {pendingCount === 1 ? 'violation' : 'violations'}
             </Text>
           </View>
-          <Icon source="chevron-right" size={22} color="#ffffff" />
+          <CardChevron variant="onDark" />
         </TouchableOpacity>
         </FadeInView>
       ) : null}
@@ -82,10 +93,10 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
           <View style={styles.cardContent}>
             <Text style={styles.cardTitle}>DFPS Site Visit</Text>
             <Text style={styles.cardDescription}>
-              Start a new completion certificate survey on-site
+              Start a New Completion Certificate Survey on Site
             </Text>
           </View>
-          <Icon source="chevron-right" size={22} color="#a0aec0" />
+          <CardChevron />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -102,7 +113,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
               View saved visits, server uploads, and push to server
             </Text>
           </View>
-          <Icon source="chevron-right" size={22} color="#a0aec0" />
+          <CardChevron />
         </TouchableOpacity>
       </FadeInView>
 
@@ -139,16 +150,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: '#ffffff',
+    ...glassStyles.cardStrong,
     padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   avatar: {
     width: 48,
@@ -204,16 +207,10 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    minHeight: 88,
+    ...glassStyles.cardStrong,
     padding: 18,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    borderRadius: 18,
   },
   cardDisabled: {
     opacity: 0.65,
@@ -222,7 +219,9 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 10,
-    backgroundColor: '#e8f0f8',
+    backgroundColor: glass.fill.frost,
+    borderWidth: 1,
+    borderColor: glass.border.inner,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -242,5 +241,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 16,
   },
-
+  cardChevron: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: glass.fill.frost,
+    borderWidth: 1,
+    borderColor: glass.border.inner,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginLeft: 10,
+    flexShrink: 0,
+  },
+  cardChevronOnDark: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
 });

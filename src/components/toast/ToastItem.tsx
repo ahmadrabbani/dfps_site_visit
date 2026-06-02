@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type {ToastVariant} from './toastController';
 import {toastVariantMeta} from './toastTheme';
+import {glassStyles} from '../../theme/glassStyles';
 
 interface ToastItemProps {
   message: string;
@@ -20,28 +21,28 @@ interface ToastItemProps {
 
 export default function ToastItem({message, variant, onDismiss}: ToastItemProps) {
   const meta = toastVariantMeta[variant];
-  const translateY = useSharedValue(-28);
+  const translateY = useSharedValue(56);
   const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.94);
+  const scale = useSharedValue(0.96);
 
   const finishDismiss = useCallback(() => {
     onDismiss();
   }, [onDismiss]);
 
   const dismiss = useCallback(() => {
-    translateY.value = withTiming(-24, {duration: 220, easing: Easing.in(Easing.cubic)});
-    opacity.value = withTiming(0, {duration: 200}, finished => {
+    translateY.value = withTiming(48, {duration: 240, easing: Easing.in(Easing.cubic)});
+    opacity.value = withTiming(0, {duration: 220}, finished => {
       if (finished) {
         runOnJS(finishDismiss)();
       }
     });
-    scale.value = withTiming(0.96, {duration: 200});
+    scale.value = withTiming(0.97, {duration: 220});
   }, [finishDismiss, opacity, scale, translateY]);
 
   useEffect(() => {
-    translateY.value = withSpring(0, {damping: 18, stiffness: 220, mass: 0.8});
-    opacity.value = withTiming(1, {duration: 260, easing: Easing.out(Easing.cubic)});
-    scale.value = withSpring(1, {damping: 16, stiffness: 200});
+    translateY.value = withSpring(0, {damping: 20, stiffness: 260, mass: 0.75});
+    opacity.value = withTiming(1, {duration: 280, easing: Easing.out(Easing.cubic)});
+    scale.value = withSpring(1, {damping: 18, stiffness: 220});
   }, [opacity, scale, translateY]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -70,24 +71,17 @@ export default function ToastItem({message, variant, onDismiss}: ToastItemProps)
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 10,
+    width: '100%',
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingRight: 14,
+    ...glassStyles.cardStrong,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingRight: 16,
     paddingLeft: 0,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.06)',
   },
   cardPressed: {
     opacity: 0.92,
@@ -107,9 +101,9 @@ const styles = StyleSheet.create({
   },
   message: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 21,
     color: '#111827',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });

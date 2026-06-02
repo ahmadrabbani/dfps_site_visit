@@ -64,7 +64,7 @@ describe('SiteVisitScreen', () => {
 
     fireEvent.press(screen.getByText('Case-101 / Plot A'));
     fireEvent.press(screen.getByText('Yes — Violation'));
-    fireEvent.press(screen.getByText('+ Add Violation'));
+    fireEvent.press(screen.getByText('Add Violation'));
 
     await waitFor(() => {
       expect(screen.getByText('Illegal extension')).toBeTruthy();
@@ -113,11 +113,11 @@ describe('SiteVisitScreen', () => {
     });
 
     fireEvent.press(screen.getByText('Yes — Violation'));
-    expect(screen.queryByText('+ Add Violation')).toBeNull();
+    expect(screen.queryByText('Add Violation')).toBeNull();
     expect(screen.getByText('Select an application case above before answering.')).toBeTruthy();
 
     fireEvent.press(screen.getByText('Case-101 / Plot A'));
     fireEvent.press(screen.getByText('Yes — Violation'));
-    expect(screen.getByText('+ Add Violation')).toBeTruthy();
+    expect(screen.getByText('Add Violation')).toBeTruthy();
   });
 });

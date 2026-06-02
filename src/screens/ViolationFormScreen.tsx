@@ -22,6 +22,7 @@ import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
+import {glassStyles} from '../theme/glassStyles';
 import {CC_FLOOR_OPTIONS, CC_UNITS, CC_VIOLATION_REMARKS_MAX} from '../constants/ccSurvey';
 import {queryKeys} from '../queries/queryKeys';
 import {fetchViolationTypes, type PenaltyCategory, type PenaltyType} from '../services/api';
@@ -31,7 +32,6 @@ import type {SiteScope} from '../types/app';
 
 interface ViolationFormScreenProps {
   scope: SiteScope;
-  onScopeChange: (scope: SiteScope) => void;
   onSave: (violation: SiteVisitViolation) => void;
   onCancel: () => void;
 }
@@ -48,7 +48,6 @@ function floorLabel(floor: string): string {
 
 export default function ViolationFormScreen({
   scope,
-  onScopeChange,
   onSave,
   onCancel,
 }: ViolationFormScreenProps) {
@@ -67,11 +66,6 @@ export default function ViolationFormScreen({
   const [lengthFocused, setLengthFocused] = useState(false);
   const [notesFocused, setNotesFocused] = useState(false);
   const insets = useSafeAreaInsets();
-
-  const scopes: Array<{label: string; value: SiteScope}> = [
-    {label: 'Residential', value: 'residential'},
-    {label: 'Commercial', value: 'commercial'},
-  ];
 
   const {
     data: penaltyTypes = [],
@@ -205,29 +199,15 @@ export default function ViolationFormScreen({
         <Text style={styles.header}>Add violation</Text>
 
         <FormLabel title="Plot category" first>
-          <View style={formStyles.plotCategoryRow}>
-            {scopes.map(option => {
-              const selected = option.value === scope;
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  accessibilityRole="button"
-                  accessibilityState={{selected}}
-                  style={[
-                    formStyles.plotCategoryChip,
-                    selected ? formStyles.plotCategoryChipActive : formStyles.plotCategoryChipInactive,
-                  ]}
-                  onPress={() => onScopeChange(option.value)}>
-                  <Text
-                    style={[
-                      formStyles.plotCategoryChipText,
-                      selected ? formStyles.plotCategoryChipTextActive : null,
-                    ]}>
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.scopePill}>
+            <Icon
+              source={scope === 'commercial' ? 'office-building-outline' : 'home-city-outline'}
+              size={18}
+              color={colors.primary}
+            />
+            <Text style={styles.scopePillText}>
+              {scope === 'commercial' ? 'Commercial' : 'Residential'}
+            </Text>
           </View>
         </FormLabel>
 
@@ -450,23 +430,30 @@ const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: colors.background},
   container: {...screenContentPadding(16, 32), flexGrow: 1},
   header: {fontSize: 20, fontWeight: '700', color: colors.primary, marginBottom: 4},
+  scopePill: {
+    ...glassStyles.panel,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scopePillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   selectField: {
-    borderWidth: 1,
-    borderColor: '#c5d0de',
-    borderRadius: 8,
+    ...glassStyles.inset,
     padding: 12,
-    backgroundColor: '#ffffff',
     minHeight: 48,
     justifyContent: 'center',
   },
   selectFieldDisabled: {opacity: 0.7},
   selectFieldText: {fontSize: 14, color: colors.text},
   input: {
-    borderWidth: 1,
-    borderColor: '#c5d0de',
-    borderRadius: 8,
+    ...glassStyles.inset,
     padding: 10,
-    backgroundColor: '#ffffff',
     fontSize: 14,
     color: colors.text,
   },
@@ -478,7 +465,7 @@ const styles = StyleSheet.create({
   chipRow: {flexDirection: 'row', flexWrap: 'wrap'},
   chip: {paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, marginRight: 8, marginBottom: 8},
   chipActive: {backgroundColor: colors.primary},
-  chipInactive: {backgroundColor: '#e5e7eb'},
+  chipInactive: {...glassStyles.chip},
   chipText: {fontSize: 13, color: colors.text},
   chipTextActive: {color: '#ffffff'},
   row: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 4},
@@ -535,11 +522,8 @@ const styles = StyleSheet.create({
   modalRow: {
     paddingVertical: 12,
     paddingHorizontal: 10,
-    borderRadius: 8,
     marginBottom: 6,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    ...glassStyles.panel,
   },
   modalRowActive: {backgroundColor: colors.primary, borderColor: colors.primary},
   modalRowText: {fontSize: 14, color: colors.text},

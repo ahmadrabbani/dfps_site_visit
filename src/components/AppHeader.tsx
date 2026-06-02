@@ -67,7 +67,7 @@ export default function AppHeader({navigation, routeName}: AppHeaderProps) {
               <Text style={styles.title} numberOfLines={1}>
                 {title}
               </Text>
-              <ConnectionStatusDot size={10} variant="onPrimary" />
+              <ConnectionStatusDot size={14} variant="onPrimary" />
             </View>
           }
         />
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     maxWidth: '100%',
     paddingHorizontal: 4,
   },

@@ -9,16 +9,32 @@ export interface ShowToastOptions {
 type ToastHandler = (options: ShowToastOptions) => void;
 
 let toastHandler: ToastHandler | null = null;
+const pendingQueue: ShowToastOptions[] = [];
 
 export function registerToastHandler(handler: ToastHandler | null): void {
   toastHandler = handler;
+  if (!handler) {
+    return;
+  }
+  while (pendingQueue.length > 0) {
+    const next = pendingQueue.shift();
+    if (next) {
+      handler(next);
+    }
+  }
 }
 
-/** Returns true if the toast UI handled the message. */
+/** Enqueues a bottom toast. Returns false only when message is empty. */
 export function enqueueToast(options: ShowToastOptions): boolean {
+  const message = options.message?.trim();
+  if (!message) {
+    return false;
+  }
+  const payload = {...options, message};
   if (toastHandler) {
-    toastHandler(options);
+    toastHandler(payload);
     return true;
   }
-  return false;
+  pendingQueue.push(payload);
+  return true;
 }

@@ -12,10 +12,12 @@ import type {NavigationState} from '@react-navigation/native';
 import {useAuthNavigation} from '../navigation/AuthNavigationContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import {colors} from '../theme/colors';
+import {glassStyles} from '../theme/glassStyles';
 import {getAppHeaderHeight} from '../theme/screenLayout';
 import {usePendingVisitCount, usePendingVisitsQuery} from '../hooks/usePendingVisitsQuery';
 import {useSyncPendingMutation} from '../hooks/useSyncPendingMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
+import {useAppTour} from '../context/AppTourContext';
 import ConnectionStatusDot from './ConnectionStatusDot';
 
 const ldaLogo = require('../../LDA-logo.png');
@@ -23,7 +25,6 @@ const ldaLogo = require('../../LDA-logo.png');
 type MenuItem = {
   route: string;
   label: string;
-  subtitle: string;
   icon: string;
 };
 
@@ -31,19 +32,16 @@ const MENU_ITEMS: MenuItem[] = [
   {
     route: MAIN_STACK_ROUTES.Dashboard,
     label: 'Dashboard',
-    subtitle: 'Overview and quick actions',
     icon: 'view-dashboard-outline',
   },
   {
     route: MAIN_STACK_ROUTES.SiteVisit,
-    label: 'DFPS Site Visit',
-    subtitle: 'Completion certificate survey',
+    label: 'Site Visit',
     icon: 'map-marker-check-outline',
   },
   {
     route: MAIN_STACK_ROUTES.MySubmissions,
-    label: 'My Site Visits & Submissions',
-    subtitle: 'Saved visits and server upload',
+    label: 'My Submissions',
     icon: 'cloud-upload-outline',
   },
 ];
@@ -70,6 +68,7 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
   const [menuNavigating, setMenuNavigating] = useState(false);
   const pendingCount = usePendingVisitCount();
   const syncMutation = useSyncPendingMutation();
+  const {startTour} = useAppTour();
   const menuNavigatingRef = useRef(false);
 
   const activeRoute = useMemo(() => getActiveStackRouteName(state), [state]);
@@ -127,6 +126,11 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
     onSignOut();
   }, [navigation, onSignOut]);
 
+  const handleAppTour = useCallback(() => {
+    navigation.closeDrawer();
+    startTour();
+  }, [navigation, startTour]);
+
   return (
     <View style={styles.root}>
       {/* Aligns with the main screen AppHeader — drawer body starts below this. */}
@@ -146,16 +150,16 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
 
           <View style={styles.userCard}>
             <View style={styles.userAvatar}>
-              <Icon source="account" size={26} color={colors.primary} />
+              <Icon source="account" size={28} color={colors.primary} />
             </View>
             <View style={styles.userMeta}>
               <Text style={styles.userName} numberOfLines={1}>
                 {user.name}
               </Text>
               <View style={styles.statusRow}>
-                <ConnectionStatusDot size={8} variant="onPrimary" />
+                <ConnectionStatusDot size={10} variant="onPrimary" />
                 <Text style={styles.statusText}>
-                  {isOnline ? 'Online' : 'Offline Mode'}
+                  {isOnline ? 'Connected' : 'Disconnected'}
                 </Text>
               </View>
             </View>
@@ -194,39 +198,61 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
                   isMySubmissions && pendingCount > 0 ? styles.menuItemPending : null,
                   pressed && !active ? styles.menuItemPressed : null,
                 ]}>
-                <View style={styles.menuItemTopRow}>
-                  <View style={styles.menuItemLabelContainer}>
-                    <Icon
-                      source={item.icon}
-                      size={22}
-                      color={active ? colors.primary : colors.primaryLight}
-                    />
-                    <Text style={[styles.menuLabel, active ? styles.menuLabelActive : null]}>
+                <View style={styles.menuIconWrap}>
+                  <Icon
+                    source={item.icon}
+                    size={34}
+                    color={active ? colors.primary : colors.primaryLight}
+                  />
+                </View>
+                <View style={styles.menuTextBlock}>
+                  <View style={styles.menuTitleRow}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.menuLabel, active ? styles.menuLabelActive : null]}>
                       {item.label}
                     </Text>
+                    {isMySubmissions && pendingCount > 0 ? (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{pendingCount}</Text>
+                      </View>
+                    ) : null}
                   </View>
-                  {isMySubmissions && pendingCount > 0 ? (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{pendingCount}</Text>
-                    </View>
-                  ) : null}
                 </View>
-                <Text style={styles.menuSubtitle} numberOfLines={2}>
-                  {item.subtitle}
-                </Text>
                 {active ? <View style={styles.activeBar} /> : null}
               </Pressable>
-              {!isLast ? <View style={styles.menuDivider} /> : null}
+              {!isLast ? <View style={styles.menuDividerWrap}><View style={styles.menuDivider} /></View> : null}
             </View>
           );
         })}
+
+        <View style={styles.drawerSignOutDividerWrap}>
+          <View style={styles.menuDivider} />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="App tour"
+          onPress={handleAppTour}
+          style={({pressed}) => [styles.drawerTourButton, pressed ? styles.drawerTourButtonPressed : null]}>
+          <Icon source="help-circle-outline" size={22} color={colors.primary} />
+          <Text style={styles.drawerTourButtonText}>App tour</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+          onPress={handleSignOut}
+          style={({pressed}) => [styles.drawerSignOutButton, pressed ? styles.signOutPressed : null]}>
+          <Icon source="logout" size={24} color="#ffffff" />
+          <Text style={styles.signOutText}>Sign out</Text>
+        </Pressable>
         </DrawerContentScrollView>
 
-      <View style={[styles.footer, {paddingBottom: Math.max(insets.bottom, 16)}]}>
+      <View style={[styles.footer, styles.drawerBodyFooter, {paddingBottom: Math.max(insets.bottom, 20)}]}>
         {pendingCount > 0 ? (
           <View style={[styles.syncCard, styles.syncCardPending]}>
             <View style={styles.syncCardMeta}>
-              <Icon source="cloud-sync-outline" size={22} color="#b45309" />
+              <Icon source="cloud-sync-outline" size={26} color="#b45309" />
               <View style={styles.syncCardText}>
                 <Text style={styles.syncCardTitle}>
                   {pendingCount} unsynced {pendingCount === 1 ? 'visit' : 'visits'}
@@ -253,15 +279,6 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
           </View>
         ) : null}
 
-        <View style={styles.footerDivider} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Sign out"
-          onPress={handleSignOut}
-          style={({pressed}) => [styles.signOutButton, pressed ? styles.signOutPressed : null]}>
-          <Icon source="logout" size={20} color="#ffffff" />
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
         <Text style={styles.footerBrand}>DFPS Site Visit</Text>
       </View>
       </View>
@@ -282,6 +299,9 @@ const styles = StyleSheet.create({
   drawerBody: {
     flex: 1,
     backgroundColor: '#ffffff',
+  },
+  drawerBodyFooter: {
+    flexShrink: 0,
   },
   header: {
     backgroundColor: colors.primary,
@@ -340,9 +360,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   userAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: '#ffffff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -371,9 +391,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 16,
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingTop: 20,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
   },
   sectionLabel: {
     fontSize: 11,
@@ -381,25 +401,50 @@ const styles = StyleSheet.create({
     color: colors.mutedText,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    marginLeft: 8,
-    marginBottom: 10,
+    marginLeft: 10,
+    marginBottom: 14,
   },
   menuItem: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 14,
     position: 'relative',
     overflow: 'hidden',
+    gap: 10,
+  },
+  menuDividerWrap: {
+    paddingVertical: 6,
+    marginVertical: 4,
+    paddingHorizontal: 4,
   },
   menuDivider: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: '#e5e7eb',
-    marginHorizontal: 14,
+    marginHorizontal: 12,
+  },
+  menuIconWrap: {
+    width: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuTextBlock: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  menuTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    flexWrap: 'nowrap',
   },
   menuItemActive: {
-    backgroundColor: '#e8f0f8',
+    ...glassStyles.panel,
+    backgroundColor: 'rgba(232, 240, 248, 0.95)',
   },
   menuItemPending: {
     borderWidth: 2,
@@ -409,9 +454,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 8,
-    marginBottom: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    marginBottom: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: '#fef2f2',
     borderWidth: 1,
@@ -433,41 +478,63 @@ const styles = StyleSheet.create({
   menuItemPressed: {
     backgroundColor: '#f3f4f6',
   },
-  menuItemTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 6,
-  },
-  menuItemLabelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    paddingRight: 8,
-  },
   menuLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.text,
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
   menuLabelActive: {
     color: colors.primary,
     fontWeight: '700',
   },
-  menuSubtitle: {
-    fontSize: 12,
-    color: colors.mutedText,
-    marginLeft: 32,
-    lineHeight: 17,
+  drawerSignOutDividerWrap: {
+    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  drawerTourButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    width: '100%',
+    minHeight: 48,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    ...glassStyles.panel,
+    gap: 10,
+    marginBottom: 10,
+  },
+  drawerTourButtonPressed: {
+    opacity: 0.9,
+  },
+  drawerTourButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  drawerSignOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
+    width: '100%',
+    minHeight: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    gap: 10,
+    marginBottom: 8,
   },
   activeBar: {
     position: 'absolute',
     left: 0,
-    top: 12,
-    bottom: 12,
+    top: 16,
+    bottom: 16,
     width: 4,
     borderTopRightRadius: 4,
     borderBottomRightRadius: 4,
@@ -481,7 +548,7 @@ const styles = StyleSheet.create({
     minWidth: 28, // slightly increased width for cleaner fit
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 4,
+    marginLeft: 6,
   },
   badgeText: {
     color: '#ffffff',
@@ -489,10 +556,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footer: {
-    paddingHorizontal: 16,
-    paddingTop: 4,
+    paddingHorizontal: 18,
+    paddingTop: 16,
     backgroundColor: '#ffffff',
     alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#f3f4f6',
   },
   syncCard: {
     flexDirection: 'row',
@@ -500,8 +569,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#fffbeb',
     borderRadius: 12,
-    padding: 10,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: '#fef3c7',
     alignSelf: 'stretch',
@@ -551,10 +620,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  footerDividerWrap: {
+    paddingVertical: 8,
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   footerDivider: {
-    height: 1,
+    height: StyleSheet.hairlineWidth,
     backgroundColor: '#e5e7eb',
-    marginBottom: 12,
     alignSelf: 'stretch',
     width: '100%',
   },
@@ -564,10 +637,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignSelf: 'stretch',
     width: '100%',
-    paddingVertical: 12,
-    borderRadius: 10,
+    minHeight: 50,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     backgroundColor: colors.primary,
-    gap: 8,
+    gap: 10,
   },
   signOutPressed: {
     opacity: 0.88,
@@ -578,11 +653,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   footerBrand: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: colors.primary,
     textAlign: 'center',
-    marginTop: 12,
+    marginTop: 16,
+    marginBottom: 4,
     letterSpacing: 0.3,
   },
 });

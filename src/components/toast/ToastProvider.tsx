@@ -1,13 +1,14 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {Modal, StyleSheet, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {ConnectionStatusBar, CONNECTION_STATUS_BAR_HEIGHT} from '../ConnectionStatusDot';
 import ToastItem from './ToastItem';
 import {
   registerToastHandler,
   type ShowToastOptions,
   type ToastVariant,
 } from './toastController';
-import {TOAST_DURATION_MS} from './toastTheme';
+import {TOAST_BOTTOM_OFFSET, TOAST_DURATION_MS} from './toastTheme';
 
 interface ActiveToast extends ShowToastOptions {
   id: string;
@@ -76,22 +77,40 @@ export default function ToastProvider({children}: ToastProviderProps) {
     };
   }, [clearTimer, enqueue]);
 
+  const connectionBarBottom = insets.bottom;
+  const toastBottom =
+    insets.bottom + CONNECTION_STATUS_BAR_HEIGHT + TOAST_BOTTOM_OFFSET;
+
   return (
     <View style={styles.root}>
       {children}
       <View
-        style={[styles.host, {top: insets.top + 8}]}
-        pointerEvents="box-none"
-        accessibilityLiveRegion="polite">
-        {active ? (
-          <ToastItem
-            key={active.id}
-            message={active.message}
-            variant={active.variant}
-            onDismiss={handleDismiss}
-          />
-        ) : null}
+        style={[styles.connectionHost, {bottom: connectionBarBottom}]}
+        pointerEvents="none">
+        <ConnectionStatusBar />
       </View>
+      <Modal
+        visible={!!active}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        presentationStyle="overFullScreen"
+        onRequestClose={handleDismiss}
+        hardwareAccelerated>
+        <View
+          style={[styles.overlay, {paddingBottom: toastBottom}]}
+          pointerEvents="box-none"
+          accessibilityLiveRegion="polite">
+          {active ? (
+            <ToastItem
+              key={active.id}
+              message={active.message}
+              variant={active.variant}
+              onDismiss={handleDismiss}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -100,11 +119,17 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
-  host: {
+  connectionHost: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 9999,
-    elevation: 9999,
+    left: 0,
+    right: 0,
+    zIndex: 9998,
+    elevation: 9998,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
   },
 });

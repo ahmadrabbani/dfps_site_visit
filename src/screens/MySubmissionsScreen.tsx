@@ -20,6 +20,7 @@ import {retryFailedNow, syncPending, syncVisitById} from '../services/syncServic
 import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
 import {screenContentPadding} from '../theme/screenLayout';
+import {glassStyles} from '../theme/glassStyles';
 import {notifyInfo, notifySuccess} from '../utils/notify';
 
 function formatDate(iso?: string) {
@@ -171,30 +172,33 @@ export default function MySubmissionsScreen() {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>My Site Visits & Submissions</Text>
       <Text style={styles.lead}>
-        Site visits are saved on this device first. When you are online, use the button below to send
-        your DFPS site visit data to the server.
+        {pending.length > 0
+          ? uploadCopy.submissionsLeadWithPending
+          : uploadCopy.submissionsLeadNoPending}
       </Text>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.primaryBtn, syncing && styles.btnDisabled]}
-          disabled={syncing}
-          onPress={handleSyncAll}>
-          {syncing ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.primaryBtnText}>{uploadCopy.pushAllPending}</Text>
-          )}
-        </TouchableOpacity>
-        {pending.some(v => v.paused || (v.retryCount || 0) > 0) ? (
+      {pending.length > 0 ? (
+        <View style={styles.actions}>
           <TouchableOpacity
-            style={[styles.secondaryBtn, syncing && styles.btnDisabled]}
+            style={[styles.primaryBtn, syncing && styles.btnDisabled]}
             disabled={syncing}
-            onPress={handleRetryAll}>
-            <Text style={styles.secondaryBtnText}>{uploadCopy.retryFailed}</Text>
+            onPress={handleSyncAll}>
+            {syncing ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.primaryBtnText}>{uploadCopy.pushAllPending}</Text>
+            )}
           </TouchableOpacity>
-        ) : null}
-      </View>
+          {pending.some(v => v.paused || (v.retryCount || 0) > 0) ? (
+            <TouchableOpacity
+              style={[styles.secondaryBtn, syncing && styles.btnDisabled]}
+              disabled={syncing}
+              onPress={handleRetryAll}>
+              <Text style={styles.secondaryBtnText}>{uploadCopy.retryFailed}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Uploaded ({submitted.length})</Text>
       {submitted.length === 0 ? (
@@ -278,12 +282,10 @@ const styles = StyleSheet.create({
   sectionTitle: {fontSize: 16, fontWeight: '600', color: colors.text, marginTop: 8, marginBottom: 10},
   empty: {fontSize: 13, color: colors.mutedText, marginBottom: 16},
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
+    ...glassStyles.card,
     padding: 12,
     marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderRadius: 14,
   },
   cardNotSubmitted: {
     borderWidth: 2,

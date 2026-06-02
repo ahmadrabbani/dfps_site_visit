@@ -16,4 +16,8 @@ export const uploadCopy = {
   drawerSync: 'Push to Server',
   drawerUnsynced: (n: number) =>
     `${n} visit${n === 1 ? '' : 's'} not on server yet`,
+  submissionsLeadWithPending:
+    'Site visits are saved on this device first. When you are online, use the button below to send your DFPS site visit data to the server.',
+  submissionsLeadNoPending:
+    'All saved site visits are on the server. Uploaded surveys are listed below.',
 };

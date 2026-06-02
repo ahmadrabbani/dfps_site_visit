@@ -14,6 +14,7 @@ import {formatForwardCcSurveyPreview} from '../services/ccSurveySubmit';
 import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
 import {screenContentPadding} from '../theme/screenLayout';
+import {glassStyles} from '../theme/glassStyles';
 import type {PendingVisit} from '../services/storage';
 
 interface SummaryScreenProps {
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.primary,
-    backgroundColor: '#ffffff',
+    ...glassStyles.panel,
     marginBottom: 16,
   },
   secondaryButtonText: {
@@ -247,12 +248,10 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {fontSize: 16, fontWeight: '600', color: colors.text, marginTop: 4, marginBottom: 10},
   card: {
-    backgroundColor: colors.card,
-    borderRadius: 10,
+    ...glassStyles.card,
     padding: 12,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderRadius: 14,
   },
   type: {fontWeight: '600', color: colors.text, fontSize: 14},
   meta: {fontSize: 13, color: colors.mutedText, marginTop: 4},
@@ -271,8 +270,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   modalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    ...glassStyles.cardStrong,
+    borderRadius: 20,
     paddingHorizontal: 22,
     paddingTop: 24,
     alignItems: 'center',
@@ -369,12 +368,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   previewLineWrap: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    ...glassStyles.panel,
     padding: 12,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
   previewLine: {
     fontSize: 14,

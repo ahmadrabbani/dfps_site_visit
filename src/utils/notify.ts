@@ -1,19 +1,7 @@
-import {Alert, Platform, ToastAndroid} from 'react-native';
 import {enqueueToast, type ToastVariant} from '../components/toast/toastController';
 
-function fallbackToast(message: string) {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(String(message), ToastAndroid.SHORT);
-    return;
-  }
-  Alert.alert('', String(message));
-}
-
 function show(variant: ToastVariant, message: string, durationMs?: number) {
-  const handled = enqueueToast({variant, message, durationMs});
-  if (!handled) {
-    fallbackToast(message);
-  }
+  enqueueToast({variant, message, durationMs});
 }
 
 export function notifyInfo(message: string) {

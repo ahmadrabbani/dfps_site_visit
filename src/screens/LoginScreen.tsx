@@ -22,6 +22,7 @@ import {Button, Chip, HelperText, Surface, TextInput, useTheme} from 'react-nati
 import {BYPASS_LOGIN, USE_FAKE_API, getBypassLoginUsername} from '../config/env';
 import {login as loginRequest, type SessionUser} from '../services/api';
 import {notifyError, notifySuccess} from '../utils/notify';
+import {glass} from '../theme/glassStyles';
 
 const backgroundImage = require('../../LDABackground.jpg');
 const logoImage = require('../../LDA-logo.png');
@@ -440,7 +441,9 @@ const styles = StyleSheet.create({
     borderRadius: CARD_RADIUS,
     paddingVertical: 22,
     paddingHorizontal: 20,
-    backgroundColor: 'rgba(255,255,255,0.98)',
+    backgroundColor: glass.fill.lightStrong,
+    borderWidth: 1,
+    borderColor: glass.border.outer,
   },
   testChip: {
     alignSelf: 'stretch',
@@ -456,7 +459,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   field: {
-    backgroundColor: '#ffffff',
+    backgroundColor: glass.fill.frost,
   },
   serverError: {
     marginBottom: 8,

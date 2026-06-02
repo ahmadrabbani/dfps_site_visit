@@ -7,7 +7,7 @@ const COARSE = PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION;
 const locationPrompt = {
   title: 'Location access',
   message:
-    'Site Visit surveys need your GPS coordinates. Allow location while using the app.',
+    'Site Visit surveys need your GPS coordinates. Allow Location while using the App.',
   buttonPositive: 'Allow',
   buttonNegative: 'Deny',
 };
