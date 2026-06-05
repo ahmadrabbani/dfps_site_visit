@@ -36,14 +36,16 @@ describe('isTestModeSession', () => {
 });
 
 describe('dev test login', () => {
-  it('matches junaid.tp3 when bypass is enabled', () => {
+  it('matches any non-empty username when bypass is enabled', () => {
     expect(matchesDevTestLogin('junaid.tp3')).toBe(true);
     expect(matchesDevTestLogin('JUNAID.TP3')).toBe(true);
-    expect(matchesDevTestLogin('admin')).toBe(false);
+    expect(matchesDevTestLogin('admin')).toBe(true);
+    expect(matchesDevTestLogin('')).toBe(false);
   });
 
-  it('signs in junaid.tp3 with any password without network', async () => {
+  it('signs in any username with any password when bypass is enabled and login fails', async () => {
     await expect(login('junaid.tp3', 'anything')).resolves.toEqual(createDevTestLoginUser('junaid.tp3'));
+    await expect(login('officer.two', 'secret')).resolves.toEqual(createDevTestLoginUser('officer.two'));
   });
 });
 

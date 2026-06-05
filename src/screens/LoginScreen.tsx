@@ -76,7 +76,7 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: BYPASS_LOGIN ? getBypassLoginUsername() : '',
+      username: '',
       password: '',
     },
     mode: 'onSubmit',
@@ -255,8 +255,8 @@ export default function LoginScreen({onLogin}: LoginScreenProps) {
                     compact
                     style={styles.testChip}
                     textStyle={styles.testChipText}
-                    accessibilityLabel="Test login uses junaid.tp3 with any password.">
-                    Test login: {bypassUsername} + any password
+                    accessibilityLabel="Bypass mode is enabled. Any username and password will be accepted.">
+                    Bypass mode: Any username/password accepted
                   </Chip>
                 ) : null}
 

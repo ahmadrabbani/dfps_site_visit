@@ -126,8 +126,8 @@ function envFlag(value: string): boolean {
 }
 
 /**
- * BYPASS_LOGIN=true — enables test sign-in (`BYPASS_LOGIN_USERNAME` + any password, no portal call).
- * BYPASS_LOGIN=false — real portal login only; dashboard test banner is hidden for real sessions.
+ * BYPASS_LOGIN=true — offline fallback for `BYPASS_LOGIN_USERNAME` when portal is unreachable.
+ * Release builds can use bypass login if BYPASS_LOGIN is set to true in the configuration.
  */
 export const BYPASS_LOGIN = envFlag(BYPASS_LOGIN_RAW);
 

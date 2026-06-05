@@ -91,7 +91,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
             <Icon source="map-marker-check-outline" size={24} color={colors.primary} />
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>DFPS Site Visit</Text>
+            <Text style={styles.cardTitle}>Completion Certificate Site Visit</Text>
             <Text style={styles.cardDescription}>
               Start a New Completion Certificate Survey on Site
             </Text>
@@ -128,7 +128,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
       </View>
 
       <Text className="text-center mt-7 text-[12px] text-[#6b7280] leading-relaxed">
-        Enable GPS on DFPS Site Visit to save a survey. Unsent visits stay on this device until you push
+        Enable GPS on Completion Certificate Site Visit to save a survey. Unsent visits stay on this device until you push
         them to the server from My Site Visits & Submissions.
       </Text>
     </ScrollView>

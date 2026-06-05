@@ -391,6 +391,22 @@ export default function SiteVisitScreen({
     onAddViolation(violations, setViolations);
   };
 
+  const handleRemoveViolation = (index: number) => {
+    setViolations(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const confirmRemoveViolation = (index: number) => {
+    const label = violations[index]?.typeLabel || violations[index]?.type || 'this violation';
+    Alert.alert('Remove violation?', `Remove "${label}" from this visit?`, [
+      {text: 'Cancel', style: 'cancel'},
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => handleRemoveViolation(index),
+      },
+    ]);
+  };
+
   const pickSiteSketch = async (useCamera: boolean) => {
     setCapturingSketch(true);
     try {
@@ -676,7 +692,18 @@ export default function SiteVisitScreen({
             <Text style={styles.helper}>Add at least one violation.</Text>
           ) : (
             violations.map((item, idx) => (
-              <View key={`${item.violationTypeId}-${idx}`} style={styles.violationCard}>
+              <View key={`${item.violationTypeId ?? 'v'}-${idx}-${item.typeLabel ?? item.type}`} style={styles.violationCard}>
+                <View style={styles.violationCardHeader}>
+                  <Text style={styles.violationCardIndex}>Violation {idx + 1}</Text>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove violation ${idx + 1}`}
+                    onPress={() => confirmRemoveViolation(idx)}
+                    style={styles.violationDeleteBtn}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Icon source="delete-outline" size={22} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
                 <Text style={styles.violationType}>{item.typeLabel || item.type}</Text>
                 {item.floorLabel ? <Text style={styles.violationMeta}>Floor: {item.floorLabel}</Text> : null}
                 {item.unit ? <Text style={styles.violationMeta}>Unit: {item.unit}</Text> : null}
@@ -685,7 +712,11 @@ export default function SiteVisitScreen({
                     Size: {item.width} x {item.length}
                   </Text>
                 ) : null}
-                {item.notes ? <Text style={styles.violationNotes}>{item.notes}</Text> : null}
+                {item.notes ? (
+                  <Text style={styles.violationNotes} numberOfLines={3}>
+                    {item.notes}
+                  </Text>
+                ) : null}
                 {item.photoUri ? (
                   <Text style={styles.violationMeta}>Local violation photo attached</Text>
                 ) : null}
@@ -1003,7 +1034,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e7eb',
   },
-  violationType: {fontWeight: '600', color: colors.text},
+  violationCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  violationCardIndex: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  violationDeleteBtn: {
+    padding: 4,
+  },
+  violationType: {fontWeight: '600', color: colors.text, fontSize: 15},
   violationMeta: {fontSize: 12, color: colors.mutedText, marginTop: 4},
   violationNotes: {fontSize: 12, color: colors.text, marginTop: 6},
   smallButton: {

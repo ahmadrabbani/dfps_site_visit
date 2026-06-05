@@ -38,8 +38,7 @@ export function matchesDevTestLogin(username: string): boolean {
   if (!BYPASS_LOGIN) {
     return false;
   }
-  const expected = getBypassLoginUsername().trim().toLowerCase();
-  return username.trim().toLowerCase() === expected;
+  return username.trim().length > 0;
 }
 
 /** Test login for BYPASS_LOGIN_USERNAME — any password, no network. */
@@ -196,12 +195,8 @@ export function parseLegacyLoginResponse(payload: unknown, username: string): Se
   };
 }
 
-export async function login(username: string, password: string): Promise<SessionUser> {
+async function performPortalLogin(username: string, password: string): Promise<SessionUser> {
   const trimmed = username.trim();
-  if (matchesDevTestLogin(trimmed)) {
-    return createDevTestLoginUser(trimmed);
-  }
-
   const url = getLoginUrl();
   const body = new URLSearchParams({
     username: trimmed,
@@ -220,9 +215,7 @@ export async function login(username: string, password: string): Promise<Session
       body,
     });
   } catch {
-    throw new Error(
-      'Cannot reach the login server. Check Wi‑Fi or mobile data. For testing, sign in as junaid.tp3 with any password.',
-    );
+    throw new Error('Cannot reach the login server. Check Wi‑Fi or mobile data.');
   }
 
   const text = await res.text();
@@ -239,6 +232,19 @@ export async function login(username: string, password: string): Promise<Session
     user.portalCookie = cookie;
   }
   return user;
+}
+
+/** Portal login for any officer; dev-only offline fallback when BYPASS_LOGIN is enabled. */
+export async function login(username: string, password: string): Promise<SessionUser> {
+  const trimmed = username.trim();
+  try {
+    return await performPortalLogin(trimmed, password);
+  } catch (err) {
+    if (BYPASS_LOGIN && matchesDevTestLogin(trimmed)) {
+      return createDevTestLoginUser(trimmed);
+    }
+    throw err;
+  }
 }
 
 function encodeUserParam(name: string): string {
