@@ -1,6 +1,8 @@
 # DFPS Site Visit App
 
-React Native app for DFPS field officers to:
+React Native app for LDA field officers to record **Completion Certificate Site Visit** surveys on-site.
+
+Officers can:
 
 - log in
 - verify on-site presence via GPS
