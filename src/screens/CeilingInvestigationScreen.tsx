@@ -17,7 +17,12 @@ import {FormLabel} from '../components/FormLabel';
 import GpsLocationCard from '../components/GpsLocationCard';
 import LookupSelect from '../components/LookupSelect';
 import PhotoPickerButtons from '../components/PhotoPickerButtons';
-import {CEILING_ACTIVITIES, CEILING_MAX_PHOTOS, PROPERTY_SEAL_TITLE} from '../constants/ceilingInvestigation';
+import {
+  CEILING_MAX_PHOTOS,
+  PROPERTY_DESEAL_TITLE,
+  PROPERTY_SEAL_TITLE,
+  SEAL_ACTIVITIES,
+} from '../constants/ceilingInvestigation';
 import {useSiteVisitGps} from '../hooks/useSiteVisitGps';
 import {queryKeys} from '../queries/queryKeys';
 import {addCeilingInvestigationVisit} from '../services/ceilingStorage';
@@ -30,6 +35,7 @@ import {notifySuccess} from '../utils/notify';
 
 interface CeilingInvestigationScreenProps {
   user: SessionUser;
+  kind?: 'seal' | 'deseal';
   locationPrepared?: boolean;
   onSaved: () => void;
 }
@@ -41,10 +47,12 @@ interface PhotoSlot {
 
 export default function CeilingInvestigationScreen({
   user,
+  kind = 'seal',
   locationPrepared = false,
   onSaved,
 }: CeilingInvestigationScreenProps) {
-  const gps = useSiteVisitGps(locationPrepared);
+  const isDeseal = kind === 'deseal';
+  const gps = useSiteVisitGps(locationPrepared && !isDeseal);
   const [scheme, setScheme] = useState('');
   const [phase, setPhase] = useState('');
   const [block, setBlock] = useState('');
@@ -61,29 +69,30 @@ export default function CeilingInvestigationScreen({
   const schemesQuery = useQuery({
     queryKey: queryKeys.plotSchemes,
     queryFn: fetchSchemes,
+    enabled: !isDeseal,
     staleTime: 10 * 60 * 1000,
   });
   const phasesQuery = useQuery({
     queryKey: queryKeys.plotPhases(scheme),
     queryFn: () => fetchPhases(scheme),
-    enabled: Boolean(scheme),
+    enabled: !isDeseal && Boolean(scheme),
     staleTime: 10 * 60 * 1000,
   });
   const blocksQuery = useQuery({
     queryKey: queryKeys.plotBlocks(scheme, phase),
     queryFn: () => fetchBlocks(scheme, phase),
-    enabled: Boolean(scheme && phase),
+    enabled: !isDeseal && Boolean(scheme && phase),
     staleTime: 10 * 60 * 1000,
   });
   const plotsQuery = useQuery({
     queryKey: queryKeys.plotPlots(scheme, phase, block),
     queryFn: () => fetchPlots(scheme, phase, block),
-    enabled: Boolean(scheme && phase && block),
+    enabled: !isDeseal && Boolean(scheme && phase && block),
     staleTime: 10 * 60 * 1000,
   });
 
   const selectedActivity = useMemo(
-    () => CEILING_ACTIVITIES.find(item => item.value === activityValue) || null,
+    () => SEAL_ACTIVITIES.find(item => item.value === activityValue) || null,
     [activityValue],
   );
 
@@ -92,15 +101,16 @@ export default function CeilingInvestigationScreen({
     [photoSlots],
   );
 
-  const canSave =
-    gps.gpsAllowed &&
-    gps.currentLat != null &&
-    gps.currentLng != null &&
-    scheme.trim().length > 0 &&
-    plotLabel.trim().length > 0 &&
-    Boolean(activityValue) &&
-    finalRemarks.trim().length > 0 &&
-    !saving;
+  const canSave = isDeseal
+    ? photoUris.length > 0 && finalRemarks.trim().length > 0 && !saving
+    : gps.gpsAllowed &&
+      gps.currentLat != null &&
+      gps.currentLng != null &&
+      scheme.trim().length > 0 &&
+      plotLabel.trim().length > 0 &&
+      Boolean(activityValue) &&
+      finalRemarks.trim().length > 0 &&
+      !saving;
 
   const pickPhotoForSlot = async (slotId: string, useCamera: boolean) => {
     setCapturingPhoto(true);
@@ -156,7 +166,12 @@ export default function CeilingInvestigationScreen({
   };
 
   const handleSave = async () => {
-    if (!canSave || gps.currentLat == null || gps.currentLng == null || !selectedActivity) {
+    if (isDeseal) {
+      if (!canSave) {
+        Alert.alert('Incomplete form', 'At least one picture and remarks are required before saving.');
+        return;
+      }
+    } else if (!canSave || gps.currentLat == null || gps.currentLng == null || !selectedActivity) {
       Alert.alert(
         'Incomplete form',
         'GPS, scheme, plot, activity, and final remarks are required before saving.',
@@ -167,21 +182,24 @@ export default function CeilingInvestigationScreen({
     try {
       await addCeilingInvestigationVisit({
         localId: `ci-${Date.now()}`,
+        kind: isDeseal ? 'deseal' : 'seal',
         officerId: user.id,
         officerName: user.name,
-        scheme: scheme.trim(),
-        phase: phase.trim(),
-        block: block.trim(),
-        plot: plotLabel.trim(),
-        activityValue: selectedActivity.value,
-        activityLabel: selectedActivity.label,
+        scheme: isDeseal ? '' : scheme.trim(),
+        phase: isDeseal ? '' : phase.trim(),
+        block: isDeseal ? '' : block.trim(),
+        plot: isDeseal ? '' : plotLabel.trim(),
+        activityValue: isDeseal ? '5' : selectedActivity!.value,
+        activityLabel: isDeseal ? 'De-sealing' : selectedActivity!.label,
         finalRemarks: finalRemarks.trim(),
         photoUris,
-        lat: gps.currentLat,
-        lng: gps.currentLng,
+        lat: isDeseal ? null : gps.currentLat,
+        lng: isDeseal ? null : gps.currentLng,
         savedAt: new Date().toISOString(),
       });
-      notifySuccess('Property Seal saved on this device.');
+      notifySuccess(
+        isDeseal ? 'Property Deseal saved on this device.' : 'Property Seal saved on this device.',
+      );
       onSaved();
     } catch {
       Alert.alert('Could not save', 'Try again.');
@@ -192,7 +210,7 @@ export default function CeilingInvestigationScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.header}>{PROPERTY_SEAL_TITLE}</Text>
+      <Text style={styles.header}>{isDeseal ? PROPERTY_DESEAL_TITLE : PROPERTY_SEAL_TITLE}</Text>
       <View style={styles.officerContainer}>
         <Icon source="account-circle" size={24} color={colors.primary} />
         <Text style={styles.officerLabel}>
@@ -200,6 +218,8 @@ export default function CeilingInvestigationScreen({
         </Text>
       </View>
 
+      {!isDeseal ? (
+        <>
       <FormLabel
         title="Scheme"
         required
@@ -295,10 +315,18 @@ export default function CeilingInvestigationScreen({
           onOpenSettings={gps.handleOpenLocationSettings}
         />
       </FormLabel>
+        </>
+      ) : null}
 
       <FormLabel
         title={`Photos (${photoUris.length}/${CEILING_MAX_PHOTOS})`}
-        hint="Optional. Add a picture field with +, then take or pick a photo for that row.">
+        required={isDeseal}
+        first={isDeseal}
+        hint={
+          isDeseal
+            ? 'Required. Add a picture field with +, then take or pick a photo for that row.'
+            : 'Optional. Add a picture field with +, then take or pick a photo for that row.'
+        }>
         {photoSlots.map((slot, index) => (
           <View key={slot.id} style={styles.photoRow}>
             <View style={styles.photoRowHeader}>
@@ -338,12 +366,13 @@ export default function CeilingInvestigationScreen({
         </TouchableOpacity>
       </FormLabel>
 
+      {!isDeseal ? (
       <FormLabel
         title="Activity"
         required
         hint="Enforcement activity from the housing portal (FIR, demolition, sealing, stay orders, notices).">
         <View style={styles.activityWrap}>
-          {CEILING_ACTIVITIES.map(item => {
+          {SEAL_ACTIVITIES.map(item => {
             const selected = item.value === activityValue;
             return (
               <TouchableOpacity
@@ -358,6 +387,7 @@ export default function CeilingInvestigationScreen({
           })}
         </View>
       </FormLabel>
+      ) : null}
 
       <FormLabel title="Final remarks" required>
         <TextInput
@@ -367,7 +397,7 @@ export default function CeilingInvestigationScreen({
           multiline
           value={finalRemarks}
           onChangeText={setFinalRemarks}
-          placeholder="Summary of this Property Seal"
+          placeholder={isDeseal ? 'Summary of this Property Deseal' : 'Summary of this Property Seal'}
           accessibilityLabel="Final remarks"
         />
       </FormLabel>
@@ -380,7 +410,9 @@ export default function CeilingInvestigationScreen({
         {saving ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text style={styles.saveButtonText}>Save Property Seal</Text>
+          <Text style={styles.saveButtonText}>
+            {isDeseal ? 'Save Property Deseal' : 'Save Property Seal'}
+          </Text>
         )}
       </TouchableOpacity>
     </ScrollView>

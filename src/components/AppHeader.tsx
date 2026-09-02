@@ -8,11 +8,12 @@ import {colors} from '../theme/colors';
 import {useAuthNavigation} from '../navigation/AuthNavigationContext';
 import {useDrawerInteraction} from '../navigation/DrawerInteractionContext';
 import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
+import {PROPERTY_DESEAL_TITLE, PROPERTY_SEAL_FLOW_TITLE, PROPERTY_SEAL_TITLE} from '../constants/ceilingInvestigation';
 
 const TITLES: Record<string, string> = {
   [MAIN_STACK_ROUTES.Dashboard]: 'Dashboard',
   [MAIN_STACK_ROUTES.SiteVisit]: 'Completion Certificate Site Visit',
-  [MAIN_STACK_ROUTES.CeilingInvestigation]: 'Property Seal',
+  [MAIN_STACK_ROUTES.CeilingInvestigation]: PROPERTY_SEAL_FLOW_TITLE,
   [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
   [MAIN_STACK_ROUTES.Summary]: 'Summary',
   [MAIN_STACK_ROUTES.MySubmissions]: 'My Site Visits & Submissions',
@@ -22,13 +23,19 @@ const TITLES: Record<string, string> = {
 interface AppHeaderProps {
   navigation: any;
   routeName: string;
+  routeParams?: {kind?: string};
 }
 
-export default function AppHeader({navigation, routeName}: AppHeaderProps) {
+export default function AppHeader({navigation, routeName, routeParams}: AppHeaderProps) {
   const insets = useSafeAreaInsets();
   const {onSignOut} = useAuthNavigation();
   const {isDrawerOpen} = useDrawerInteraction();
-  const title = TITLES[routeName] || 'DFPS';
+  const title =
+    routeName === MAIN_STACK_ROUTES.CeilingInvestigation
+      ? routeParams?.kind === 'deseal'
+        ? PROPERTY_DESEAL_TITLE
+        : PROPERTY_SEAL_TITLE
+      : TITLES[routeName] || 'DFPS';
   const canGoBack = navigation.canGoBack() && !isDrawerOpen;
 
   const openDrawer = () => {

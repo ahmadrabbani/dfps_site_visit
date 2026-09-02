@@ -17,6 +17,7 @@ import {getAppHeaderHeight} from '../theme/screenLayout';
 import {usePendingVisitCount, usePendingVisitsQuery} from '../hooks/usePendingVisitsQuery';
 import {useSyncPendingMutation} from '../hooks/useSyncPendingMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
+import {promptPropertySealKind} from '../utils/promptPropertySealKind';
 import {useAppTour} from '../context/AppTourContext';
 import ConnectionStatusDot from './ConnectionStatusDot';
 
@@ -41,7 +42,7 @@ const MENU_ITEMS: MenuItem[] = [
   },
   {
     route: MAIN_STACK_ROUTES.CeilingInvestigation,
-    label: 'Property Seal',
+    label: 'Property Seal & Deseal',
     icon: 'home-search-outline',
   },
   {
@@ -108,18 +109,36 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
         });
         await new Promise<void>(resolve => setTimeout(resolve, 320));
 
-        if (screen === MAIN_STACK_ROUTES.SiteVisit || screen === MAIN_STACK_ROUTES.CeilingInvestigation) {
+        if (screen === MAIN_STACK_ROUTES.SiteVisit) {
           const allowed = await prepareSiteVisitLocation();
           if (!allowed) {
             return;
           }
         }
+        let ceilingParams: {locationPrepared?: boolean; kind?: 'seal' | 'deseal'} | undefined;
+        if (screen === MAIN_STACK_ROUTES.CeilingInvestigation) {
+          const kind = await promptPropertySealKind();
+          if (!kind) {
+            return;
+          }
+          if (kind === 'seal') {
+            const allowed = await prepareSiteVisitLocation();
+            if (!allowed) {
+              return;
+            }
+            ceilingParams = {locationPrepared: true, kind};
+          } else {
+            ceilingParams = {locationPrepared: false, kind};
+          }
+        }
         navigation.navigate(DRAWER_ROUTES.Main, {
           screen,
           params:
-            screen === MAIN_STACK_ROUTES.SiteVisit || screen === MAIN_STACK_ROUTES.CeilingInvestigation
+            screen === MAIN_STACK_ROUTES.SiteVisit
               ? {locationPrepared: true}
-              : undefined,
+              : screen === MAIN_STACK_ROUTES.CeilingInvestigation
+                ? ceilingParams
+                : undefined,
         });
       } finally {
         menuNavigatingRef.current = false;

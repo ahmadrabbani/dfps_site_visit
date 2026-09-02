@@ -17,6 +17,7 @@ import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 import {useSubmitSiteVisitMutation} from '../hooks/useSubmitSiteVisitMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
+import {promptPropertySealKind} from '../utils/promptPropertySealKind';
 import AppTourModal from '../components/AppTourModal';
 import {AppTourProvider} from '../context/AppTourContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
@@ -27,7 +28,13 @@ const Drawer = createDrawerNavigator();
 const Stack = createNativeStackNavigator();
 
 function MainStackHeader(props: any) {
-  return <AppHeader navigation={props.navigation} routeName={props.route.name} />;
+  return (
+    <AppHeader
+      navigation={props.navigation}
+      routeName={props.route.name}
+      routeParams={props.route.params}
+    />
+  );
 }
 
 function DashboardRouteScreen() {
@@ -58,10 +65,25 @@ function DashboardRouteScreen() {
     }
     setStartingCeiling(true);
     try {
-      const allowed = await prepareSiteVisitLocation();
-      if (allowed) {
-        navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {locationPrepared: true});
+      const kind = await promptPropertySealKind();
+      if (!kind) {
+        return;
       }
+      if (kind === 'seal') {
+        const allowed = await prepareSiteVisitLocation();
+        if (!allowed) {
+          return;
+        }
+        navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {
+          locationPrepared: true,
+          kind,
+        });
+        return;
+      }
+      navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {
+        locationPrepared: false,
+        kind,
+      });
     } finally {
       setStartingCeiling(false);
     }
@@ -112,11 +134,13 @@ function CeilingInvestigationRouteScreen() {
   const route = useRoute<any>();
   const {user} = useAuthNavigation();
   const locationPrepared = route.params?.locationPrepared === true;
+  const kind = route.params?.kind === 'deseal' ? 'deseal' : 'seal';
 
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <CeilingInvestigationScreen
         user={user}
+        kind={kind}
         locationPrepared={locationPrepared}
         onSaved={() => {
           navigation.reset({index: 0, routes: [{name: MAIN_STACK_ROUTES.Dashboard}]});

@@ -112,14 +112,14 @@ export default function DashboardScreen({
           onPress={onStartCeiling}
           disabled={startingVisit || startingCeiling}
           accessibilityRole="button"
-          accessibilityLabel="Property Seal">
+          accessibilityLabel="Property Seal and Deseal">
           <View style={styles.cardIconWrap}>
             <Icon source="home-search-outline" size={24} color={colors.primary} />
           </View>
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>Property Seal</Text>
+            <Text style={styles.cardTitle}>Property Seal & Deseal</Text>
             <Text style={styles.cardDescription}>
-              Record scheme, plot, GPS, photos, and enforcement activity
+              Choose Property Seal or Property Deseal, then fill the matching form
             </Text>
           </View>
           <CardChevron />
@@ -154,7 +154,7 @@ export default function DashboardScreen({
       </View>
 
       <Text className="text-center mt-7 text-[12px] text-[#6b7280] leading-relaxed">
-        Enable GPS on a site visit or Property Seal to save. Unsent CC visits stay on this device until you push
+        Enable GPS on a site visit or Property Seal to save. Property Deseal needs pictures and remarks only. Unsent CC visits stay on this device until you push
         them to the server from My Site Visits & Submissions.
       </Text>
     </ScrollView>

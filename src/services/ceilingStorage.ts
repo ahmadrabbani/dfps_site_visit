@@ -3,8 +3,11 @@ import {reportServiceError} from './errorReporting';
 
 const CEILING_VISITS_KEY = 'CEILING_INVESTIGATION_VISITS';
 
+export type PropertySealVisitKind = 'seal' | 'deseal';
+
 export interface CeilingInvestigationVisit {
   localId: string;
+  kind?: PropertySealVisitKind;
   officerId: number | string;
   officerName: string;
   scheme: string;
@@ -15,8 +18,8 @@ export interface CeilingInvestigationVisit {
   activityLabel: string;
   finalRemarks: string;
   photoUris: string[];
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   savedAt: string;
 }
 

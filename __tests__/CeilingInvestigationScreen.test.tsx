@@ -44,7 +44,7 @@ const mockPhases = fetchPhases as jest.MockedFunction<typeof fetchPhases>;
 const mockBlocks = fetchBlocks as jest.MockedFunction<typeof fetchBlocks>;
 const mockPlots = fetchPlots as jest.MockedFunction<typeof fetchPlots>;
 
-function renderScreen(onSaved = jest.fn()) {
+function renderScreen(onSaved = jest.fn(), kind: 'seal' | 'deseal' = 'seal') {
   const client = new QueryClient({
     defaultOptions: {queries: {retry: false}},
   });
@@ -57,6 +57,7 @@ function renderScreen(onSaved = jest.fn()) {
       <QueryClientProvider client={client}>
         <CeilingInvestigationScreen
           user={{id: 1, username: 'officer.a', name: 'Officer A', token: 't'}}
+          kind={kind}
           onSaved={onSaved}
         />
       </QueryClientProvider>
@@ -66,6 +67,10 @@ function renderScreen(onSaved = jest.fn()) {
 
 describe('CeilingInvestigationScreen', () => {
   beforeEach(() => {
+    mockSchemes.mockClear();
+    mockPhases.mockClear();
+    mockBlocks.mockClear();
+    mockPlots.mockClear();
     mockSchemes.mockResolvedValue([{value: 'Johar Town', label: 'JOHAR TOWN'}]);
     mockPhases.mockResolvedValue([{value: 'Phase 1', label: 'Phase 1'}]);
     mockBlocks.mockResolvedValue([{value: 'Block A', label: 'Block A'}]);
@@ -93,5 +98,19 @@ describe('CeilingInvestigationScreen', () => {
     expect(mockPhases).not.toHaveBeenCalled();
     expect(mockBlocks).not.toHaveBeenCalled();
     expect(mockPlots).not.toHaveBeenCalled();
+  });
+
+  test('deseal form shows pictures and remarks only', async () => {
+    renderScreen(jest.fn(), 'deseal');
+
+    await waitFor(() => {
+      expect(screen.getByText('Property Deseal')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('Scheme')).toBeNull();
+    expect(screen.queryByText('Activity')).toBeNull();
+    expect(screen.getByLabelText('Final remarks')).toBeTruthy();
+    expect(screen.getByLabelText('Add picture field')).toBeTruthy();
+    expect(screen.getByText('Save Property Deseal')).toBeDisabled();
+    expect(mockSchemes).not.toHaveBeenCalled();
   });
 });

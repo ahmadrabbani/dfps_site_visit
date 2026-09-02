@@ -17,6 +17,11 @@ export const CEILING_ACTIVITIES = [
 
 export type CeilingActivityValue = (typeof CEILING_ACTIVITIES)[number]['value'];
 
+export const PROPERTY_SEAL_FLOW_TITLE = 'Property Seal & Deseal';
 export const PROPERTY_SEAL_TITLE = 'Property Seal';
+export const PROPERTY_DESEAL_TITLE = 'Property Deseal';
+
+/** Seal form omits De-sealing — that is its own flow. */
+export const SEAL_ACTIVITIES = CEILING_ACTIVITIES.filter(item => item.value !== '5');
 
 export const CEILING_MAX_PHOTOS = 8;
