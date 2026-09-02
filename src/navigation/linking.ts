@@ -11,7 +11,7 @@ export const linking = {
             screens: {
               [MAIN_STACK_ROUTES.Dashboard]: 'dashboard',
               [MAIN_STACK_ROUTES.SiteVisit]: 'visit',
-              [MAIN_STACK_ROUTES.CeilingInvestigation]: 'property-seal',
+              [MAIN_STACK_ROUTES.PropertySeal]: 'property-seal',
               [MAIN_STACK_ROUTES.ViolationForm]: 'violation/new',
               [MAIN_STACK_ROUTES.Summary]: 'visit/summary',
             },

@@ -22,17 +22,17 @@ function CardChevron({variant = 'default'}: {variant?: 'default' | 'onDark'}) {
 interface DashboardScreenProps {
   user: SessionUser;
   onStartVisit: () => void;
-  onStartCeiling: () => void;
+  onStartPropertySeal: () => void;
   startingVisit?: boolean;
-  startingCeiling?: boolean;
+  startingPropertySeal?: boolean;
 }
 
 export default function DashboardScreen({
   user,
   onStartVisit,
-  onStartCeiling,
+  onStartPropertySeal,
   startingVisit = false,
-  startingCeiling = false,
+  startingPropertySeal = false,
 }: DashboardScreenProps) {
   const navigation = useNavigation<any>();
   const pendingCount = usePendingVisitCount();
@@ -92,7 +92,7 @@ export default function DashboardScreen({
         <TouchableOpacity
           style={[styles.card, startingVisit ? styles.cardDisabled : null]}
           onPress={onStartVisit}
-          disabled={startingVisit || startingCeiling}
+          disabled={startingVisit || startingPropertySeal}
           accessibilityRole="button"
           accessibilityLabel="Initiate site visit">
           <View style={styles.cardIconWrap}>
@@ -108,9 +108,9 @@ export default function DashboardScreen({
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.card, startingCeiling ? styles.cardDisabled : null]}
-          onPress={onStartCeiling}
-          disabled={startingVisit || startingCeiling}
+          style={[styles.card, startingPropertySeal ? styles.cardDisabled : null]}
+          onPress={onStartPropertySeal}
+          disabled={startingVisit || startingPropertySeal}
           accessibilityRole="button"
           accessibilityLabel="Property Seal and Deseal">
           <View style={styles.cardIconWrap}>

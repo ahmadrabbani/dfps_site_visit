@@ -18,14 +18,14 @@ import GpsLocationCard from '../components/GpsLocationCard';
 import LookupSelect from '../components/LookupSelect';
 import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {
-  CEILING_MAX_PHOTOS,
   PROPERTY_DESEAL_TITLE,
+  PROPERTY_SEAL_MAX_PHOTOS,
   PROPERTY_SEAL_TITLE,
   SEAL_ACTIVITIES,
-} from '../constants/ceilingInvestigation';
+} from '../constants/propertySeal';
 import {useSiteVisitGps} from '../hooks/useSiteVisitGps';
 import {queryKeys} from '../queries/queryKeys';
-import {addCeilingInvestigationVisit} from '../services/ceilingStorage';
+import {addPropertySealVisit} from '../services/propertySealStorage';
 import {fetchBlocks, fetchPhases, fetchPlots, fetchSchemes} from '../services/plotBank';
 import type {SessionUser} from '../services/api';
 import {colors} from '../theme/colors';
@@ -33,7 +33,7 @@ import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
 import {notifySuccess} from '../utils/notify';
 
-interface CeilingInvestigationScreenProps {
+interface PropertySealScreenProps {
   user: SessionUser;
   kind?: 'seal' | 'deseal';
   locationPrepared?: boolean;
@@ -45,12 +45,12 @@ interface PhotoSlot {
   uri: string | null;
 }
 
-export default function CeilingInvestigationScreen({
+export default function PropertySealScreen({
   user,
   kind = 'seal',
   locationPrepared = false,
   onSaved,
-}: CeilingInvestigationScreenProps) {
+}: PropertySealScreenProps) {
   const isDeseal = kind === 'deseal';
   const gps = useSiteVisitGps(locationPrepared && !isDeseal);
   const [scheme, setScheme] = useState('');
@@ -146,8 +146,8 @@ export default function CeilingInvestigationScreen({
   };
 
   const addPhotoSlot = () => {
-    if (photoSlots.length >= CEILING_MAX_PHOTOS) {
-      Alert.alert('Photo limit', `You can attach up to ${CEILING_MAX_PHOTOS} photos.`);
+    if (photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS) {
+      Alert.alert('Photo limit', `You can attach up to ${PROPERTY_SEAL_MAX_PHOTOS} photos.`);
       return;
     }
     photoIdRef.current += 1;
@@ -180,8 +180,8 @@ export default function CeilingInvestigationScreen({
     }
     setSaving(true);
     try {
-      await addCeilingInvestigationVisit({
-        localId: `ci-${Date.now()}`,
+      await addPropertySealVisit({
+        localId: `ps-${Date.now()}`,
         kind: isDeseal ? 'deseal' : 'seal',
         officerId: user.id,
         officerName: user.name,
@@ -319,7 +319,7 @@ export default function CeilingInvestigationScreen({
       ) : null}
 
       <FormLabel
-        title={`Photos (${photoUris.length}/${CEILING_MAX_PHOTOS})`}
+        title={`Photos (${photoUris.length}/${PROPERTY_SEAL_MAX_PHOTOS})`}
         required={isDeseal}
         first={isDeseal}
         hint={
@@ -355,10 +355,10 @@ export default function CeilingInvestigationScreen({
         <TouchableOpacity
           style={[
             styles.addPhotoButton,
-            photoSlots.length >= CEILING_MAX_PHOTOS || capturingPhoto ? styles.addPhotoButtonDisabled : null,
+            photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto ? styles.addPhotoButtonDisabled : null,
           ]}
           onPress={addPhotoSlot}
-          disabled={photoSlots.length >= CEILING_MAX_PHOTOS || capturingPhoto}
+          disabled={photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto}
           accessibilityRole="button"
           accessibilityLabel="Add picture field">
           <Icon source="plus" size={20} color="#ffffff" />

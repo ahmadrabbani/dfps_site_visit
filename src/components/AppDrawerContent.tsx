@@ -41,7 +41,7 @@ const MENU_ITEMS: MenuItem[] = [
     icon: 'map-marker-check-outline',
   },
   {
-    route: MAIN_STACK_ROUTES.CeilingInvestigation,
+    route: MAIN_STACK_ROUTES.PropertySeal,
     label: 'Property Seal & Deseal',
     icon: 'home-search-outline',
   },
@@ -115,8 +115,8 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
             return;
           }
         }
-        let ceilingParams: {locationPrepared?: boolean; kind?: 'seal' | 'deseal'} | undefined;
-        if (screen === MAIN_STACK_ROUTES.CeilingInvestigation) {
+        let propertySealParams: {locationPrepared?: boolean; kind?: 'seal' | 'deseal'} | undefined;
+        if (screen === MAIN_STACK_ROUTES.PropertySeal) {
           const kind = await promptPropertySealKind();
           if (!kind) {
             return;
@@ -126,9 +126,9 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
             if (!allowed) {
               return;
             }
-            ceilingParams = {locationPrepared: true, kind};
+            propertySealParams = {locationPrepared: true, kind};
           } else {
-            ceilingParams = {locationPrepared: false, kind};
+            propertySealParams = {locationPrepared: false, kind};
           }
         }
         navigation.navigate(DRAWER_ROUTES.Main, {
@@ -136,8 +136,8 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
           params:
             screen === MAIN_STACK_ROUTES.SiteVisit
               ? {locationPrepared: true}
-              : screen === MAIN_STACK_ROUTES.CeilingInvestigation
-                ? ceilingParams
+              : screen === MAIN_STACK_ROUTES.PropertySeal
+                ? propertySealParams
                 : undefined,
         });
       } finally {

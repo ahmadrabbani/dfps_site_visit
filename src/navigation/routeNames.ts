@@ -11,7 +11,7 @@ export const DRAWER_ROUTES = {
 export const MAIN_STACK_ROUTES = {
   Dashboard: 'Dashboard',
   SiteVisit: 'SiteVisit',
-  CeilingInvestigation: 'CeilingInvestigation',
+  PropertySeal: 'PropertySeal',
   ViolationForm: 'ViolationForm',
   Summary: 'Summary',
   MySubmissions: 'MySubmissions',

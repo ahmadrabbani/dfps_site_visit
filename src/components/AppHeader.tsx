@@ -8,12 +8,12 @@ import {colors} from '../theme/colors';
 import {useAuthNavigation} from '../navigation/AuthNavigationContext';
 import {useDrawerInteraction} from '../navigation/DrawerInteractionContext';
 import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
-import {PROPERTY_DESEAL_TITLE, PROPERTY_SEAL_FLOW_TITLE, PROPERTY_SEAL_TITLE} from '../constants/ceilingInvestigation';
+import {PROPERTY_DESEAL_TITLE, PROPERTY_SEAL_FLOW_TITLE, PROPERTY_SEAL_TITLE} from '../constants/propertySeal';
 
 const TITLES: Record<string, string> = {
   [MAIN_STACK_ROUTES.Dashboard]: 'Dashboard',
   [MAIN_STACK_ROUTES.SiteVisit]: 'Completion Certificate Site Visit',
-  [MAIN_STACK_ROUTES.CeilingInvestigation]: PROPERTY_SEAL_FLOW_TITLE,
+  [MAIN_STACK_ROUTES.PropertySeal]: PROPERTY_SEAL_FLOW_TITLE,
   [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
   [MAIN_STACK_ROUTES.Summary]: 'Summary',
   [MAIN_STACK_ROUTES.MySubmissions]: 'My Site Visits & Submissions',
@@ -31,7 +31,7 @@ export default function AppHeader({navigation, routeName, routeParams}: AppHeade
   const {onSignOut} = useAuthNavigation();
   const {isDrawerOpen} = useDrawerInteraction();
   const title =
-    routeName === MAIN_STACK_ROUTES.CeilingInvestigation
+    routeName === MAIN_STACK_ROUTES.PropertySeal
       ? routeParams?.kind === 'deseal'
         ? PROPERTY_DESEAL_TITLE
         : PROPERTY_SEAL_TITLE

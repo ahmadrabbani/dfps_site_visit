@@ -1,4 +1,4 @@
-# Ceiling Implementation
+# Property Seal Implementation
 
 Checklist for adding **Ceiling Investigation (CI)** to the React Native app. The live housing portal already has this module. The app currently only implements **Completion Certificate (CC)** site visit.
 
@@ -43,7 +43,7 @@ Do **not** POST Ceiling app data to CC (`conf_add_cc_form.php` / `forward_cc_sur
 | `add_completion_certificate_survey.php` | `conf_add_cc_form.php` | **CC only** — leave this alone. |
 | `conf_add_survey - Copy.php` | (stale copy, not wired from a live `add_*.php` in this tree) | Old **`tbl_survey`** save with `action_type` — this is the only save handler that matches the app’s FIR / demolition / sealing Activity list. |
 
-`add_survey_form_v3.php` still has leftover JS for `#action_type` → `get_general_value.php?typ=getActionHtml`, but the HTML form has **no** `action_type` select. Activity UI lives in `get_general_value.php` (`getActionHtml`) and labels in `SurveyTypeAttachment` (`class/cls_functions.php`). Values 1–10 match `src/constants/ceilingInvestigation.ts`.
+`add_survey_form_v3.php` still has leftover JS for `#action_type` → `get_general_value.php?typ=getActionHtml`, but the HTML form has **no** `action_type` select. Activity UI lives in `get_general_value.php` (`getActionHtml`) and labels in `SurveyTypeAttachment` (`class/cls_functions.php`). Values 1–10 match `src/constants/propertySeal.ts`.
 
 ### Current Perform Survey POST (`conf_add_survey_form_v3.php`)
 

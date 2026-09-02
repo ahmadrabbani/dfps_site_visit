@@ -2,7 +2,7 @@ import React from 'react';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {render, screen, waitFor} from '@testing-library/react-native';
-import CeilingInvestigationScreen from '../src/screens/CeilingInvestigationScreen';
+import PropertySealScreen from '../src/screens/PropertySealScreen';
 import {fetchBlocks, fetchPhases, fetchPlots, fetchSchemes} from '../src/services/plotBank';
 
 jest.mock('../src/utils/notify', () => ({
@@ -28,8 +28,8 @@ jest.mock('../src/hooks/useSiteVisitGps', () => ({
   formatCoord: (value: number | null) => (value != null ? String(value) : '—'),
 }));
 
-jest.mock('../src/services/ceilingStorage', () => ({
-  addCeilingInvestigationVisit: jest.fn().mockResolvedValue(undefined),
+jest.mock('../src/services/propertySealStorage', () => ({
+  addPropertySealVisit: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../src/services/plotBank', () => ({
@@ -55,7 +55,7 @@ function renderScreen(onSaved = jest.fn(), kind: 'seal' | 'deseal' = 'seal') {
         insets: {top: 0, left: 0, right: 0, bottom: 0},
       }}>
       <QueryClientProvider client={client}>
-        <CeilingInvestigationScreen
+        <PropertySealScreen
           user={{id: 1, username: 'officer.a', name: 'Officer A', token: 't'}}
           kind={kind}
           onSaved={onSaved}
@@ -65,7 +65,7 @@ function renderScreen(onSaved = jest.fn(), kind: 'seal' | 'deseal' = 'seal') {
   );
 }
 
-describe('CeilingInvestigationScreen', () => {
+describe('PropertySealScreen', () => {
   beforeEach(() => {
     mockSchemes.mockClear();
     mockPhases.mockClear();

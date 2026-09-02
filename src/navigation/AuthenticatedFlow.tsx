@@ -11,7 +11,7 @@ import AppHeader from '../components/AppHeader';
 import {colors} from '../theme/colors';
 import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
-import CeilingInvestigationScreen from '../screens/CeilingInvestigationScreen';
+import PropertySealScreen from '../screens/PropertySealScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
 import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
@@ -41,10 +41,10 @@ function DashboardRouteScreen() {
   const navigation = useNavigation<any>();
   const {user, setSiteScope} = useAuthNavigation();
   const [startingVisit, setStartingVisit] = useState(false);
-  const [startingCeiling, setStartingCeiling] = useState(false);
+  const [startingPropertySeal, setStartingPropertySeal] = useState(false);
 
   const handleStartVisit = async () => {
-    if (startingVisit || startingCeiling) {
+    if (startingVisit || startingPropertySeal) {
       return;
     }
     setStartingVisit(true);
@@ -59,11 +59,11 @@ function DashboardRouteScreen() {
     }
   };
 
-  const handleStartCeiling = async () => {
-    if (startingVisit || startingCeiling) {
+  const handleStartPropertySeal = async () => {
+    if (startingVisit || startingPropertySeal) {
       return;
     }
-    setStartingCeiling(true);
+    setStartingPropertySeal(true);
     try {
       const kind = await promptPropertySealKind();
       if (!kind) {
@@ -74,18 +74,18 @@ function DashboardRouteScreen() {
         if (!allowed) {
           return;
         }
-        navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {
+        navigation.navigate(MAIN_STACK_ROUTES.PropertySeal, {
           locationPrepared: true,
           kind,
         });
         return;
       }
-      navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {
+      navigation.navigate(MAIN_STACK_ROUTES.PropertySeal, {
         locationPrepared: false,
         kind,
       });
     } finally {
-      setStartingCeiling(false);
+      setStartingPropertySeal(false);
     }
   };
 
@@ -94,9 +94,9 @@ function DashboardRouteScreen() {
       <DashboardScreen
         user={user}
         startingVisit={startingVisit}
-        startingCeiling={startingCeiling}
+        startingPropertySeal={startingPropertySeal}
         onStartVisit={() => void handleStartVisit()}
-        onStartCeiling={() => void handleStartCeiling()}
+        onStartPropertySeal={() => void handleStartPropertySeal()}
       />
     </SafeAreaView>
   );
@@ -129,7 +129,7 @@ function SiteVisitRouteScreen() {
   );
 }
 
-function CeilingInvestigationRouteScreen() {
+function PropertySealRouteScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {user} = useAuthNavigation();
@@ -138,7 +138,7 @@ function CeilingInvestigationRouteScreen() {
 
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
-      <CeilingInvestigationScreen
+      <PropertySealScreen
         user={user}
         kind={kind}
         locationPrepared={locationPrepared}
@@ -223,8 +223,8 @@ function MainStack() {
       <Stack.Screen name={MAIN_STACK_ROUTES.Dashboard} component={DashboardRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.SiteVisit} component={SiteVisitRouteScreen} />
       <Stack.Screen
-        name={MAIN_STACK_ROUTES.CeilingInvestigation}
-        component={CeilingInvestigationRouteScreen}
+        name={MAIN_STACK_ROUTES.PropertySeal}
+        component={PropertySealRouteScreen}
       />
       <Stack.Screen name={MAIN_STACK_ROUTES.ViolationForm} component={ViolationFormRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.Summary} component={SummaryRouteScreen} />

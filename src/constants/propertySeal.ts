@@ -2,7 +2,7 @@
  * Enforcement activity options from housing portal `tbl_survey.action_type`
  * (`SurveyTypeAttachment` / `getActionHtml` in housingportal).
  */
-export const CEILING_ACTIVITIES = [
+export const PROPERTY_SEAL_ACTIVITIES = [
   {value: '1', label: 'FIR'},
   {value: '2', label: 'Demolition'},
   {value: '3', label: 'Letters for services disconnection'},
@@ -15,13 +15,13 @@ export const CEILING_ACTIVITIES = [
   {value: '10', label: 'Notice 40 (II)'},
 ] as const;
 
-export type CeilingActivityValue = (typeof CEILING_ACTIVITIES)[number]['value'];
+export type PropertySealActivityValue = (typeof PROPERTY_SEAL_ACTIVITIES)[number]['value'];
 
 export const PROPERTY_SEAL_FLOW_TITLE = 'Property Seal & Deseal';
 export const PROPERTY_SEAL_TITLE = 'Property Seal';
 export const PROPERTY_DESEAL_TITLE = 'Property Deseal';
 
 /** Seal form omits De-sealing — that is its own flow. */
-export const SEAL_ACTIVITIES = CEILING_ACTIVITIES.filter(item => item.value !== '5');
+export const SEAL_ACTIVITIES = PROPERTY_SEAL_ACTIVITIES.filter(item => item.value !== '5');
 
-export const CEILING_MAX_PHOTOS = 8;
+export const PROPERTY_SEAL_MAX_PHOTOS = 8;
