@@ -22,10 +22,18 @@ function CardChevron({variant = 'default'}: {variant?: 'default' | 'onDark'}) {
 interface DashboardScreenProps {
   user: SessionUser;
   onStartVisit: () => void;
+  onStartCeiling: () => void;
   startingVisit?: boolean;
+  startingCeiling?: boolean;
 }
 
-export default function DashboardScreen({user, onStartVisit, startingVisit = false}: DashboardScreenProps) {
+export default function DashboardScreen({
+  user,
+  onStartVisit,
+  onStartCeiling,
+  startingVisit = false,
+  startingCeiling = false,
+}: DashboardScreenProps) {
   const navigation = useNavigation<any>();
   const pendingCount = usePendingVisitCount();
 
@@ -38,7 +46,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
         </View>
         <View style={styles.headerText}>
           <Text style={styles.greeting} numberOfLines={1}>Welcome, {user.name}</Text>
-          <Text style={styles.subtitle}>Completion Certificate Site Visit</Text>
+          <Text style={styles.subtitle}>Site visit surveys</Text>
         </View>
       </FadeInView>
 
@@ -84,7 +92,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
         <TouchableOpacity
           style={[styles.card, startingVisit ? styles.cardDisabled : null]}
           onPress={onStartVisit}
-          disabled={startingVisit}
+          disabled={startingVisit || startingCeiling}
           accessibilityRole="button"
           accessibilityLabel="Initiate site visit">
           <View style={styles.cardIconWrap}>
@@ -94,6 +102,24 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
             <Text style={styles.cardTitle}>Completion Certificate Site Visit</Text>
             <Text style={styles.cardDescription}>
               Start a New Completion Certificate Survey on Site
+            </Text>
+          </View>
+          <CardChevron />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, startingCeiling ? styles.cardDisabled : null]}
+          onPress={onStartCeiling}
+          disabled={startingVisit || startingCeiling}
+          accessibilityRole="button"
+          accessibilityLabel="Property Seal">
+          <View style={styles.cardIconWrap}>
+            <Icon source="home-search-outline" size={24} color={colors.primary} />
+          </View>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>Property Seal</Text>
+            <Text style={styles.cardDescription}>
+              Record scheme, plot, GPS, photos, and enforcement activity
             </Text>
           </View>
           <CardChevron />
@@ -128,7 +154,7 @@ export default function DashboardScreen({user, onStartVisit, startingVisit = fal
       </View>
 
       <Text className="text-center mt-7 text-[12px] text-[#6b7280] leading-relaxed">
-        Enable GPS on Completion Certificate Site Visit to save a survey. Unsent visits stay on this device until you push
+        Enable GPS on a site visit or Property Seal to save. Unsent CC visits stay on this device until you push
         them to the server from My Site Visits & Submissions.
       </Text>
     </ScrollView>

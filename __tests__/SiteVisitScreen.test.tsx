@@ -5,6 +5,22 @@ import SiteVisitScreen from '../src/screens/SiteVisitScreen';
 import {fetchCaseList} from '../src/services/api';
 import type {SiteVisitViolation} from '../src/services/storage';
 
+jest.mock('../src/hooks/useSiteVisitGps', () => ({
+  useSiteVisitGps: () => ({
+    gpsAllowed: true,
+    gpsLoading: false,
+    gpsError: null,
+    gpsPermissionDenied: false,
+    currentLat: 31.5,
+    currentLng: 74.3,
+    needsPermissionPrompt: false,
+    handleGetLocation: jest.fn(),
+    startLocationFlow: jest.fn(),
+    handleOpenLocationSettings: jest.fn(),
+  }),
+  formatCoord: (value: number | null) => (value != null ? String(value) : '—'),
+}));
+
 jest.mock('../src/services/api', () => {
   const actual = jest.requireActual('../src/services/api');
   return {
@@ -89,7 +105,7 @@ describe('SiteVisitScreen', () => {
         isViolation: true,
         noOfFloors: 3,
         scope: 'residential',
-        coords: {lat: 31.5204, lng: 74.3587},
+        coords: {lat: 31.5, lng: 74.3},
         violations: expect.arrayContaining([
           expect.objectContaining({typeLabel: 'Illegal extension', floorLabel: 'GF', unit: 'sqft'}),
         ]),

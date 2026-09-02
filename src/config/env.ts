@@ -12,6 +12,9 @@ export const CC_SURVEY_URL_RAW = Config.CC_SURVEY_URL ?? '';
 /** cc_application_list.php (no query string). */
 export const CC_APPLICATION_LIST_URL_RAW = Config.CC_APPLICATION_LIST_URL ?? '';
 
+/** plot_bank.php (scheme / phase / block / plot lists). */
+export const PLOT_BANK_URL_RAW = Config.PLOT_BANK_URL ?? '';
+
 /** Legacy tbllogin script (full URL to login handler PHP). */
 export const LOGIN_URL_RAW = Config.LOGIN_URL ?? '';
 
@@ -83,6 +86,20 @@ export function getCcApplicationListUrl(): string {
     return trimmed.replace(/\/$/, '');
   }
   return DEFAULT_CC_APPLICATION_LIST_URL;
+}
+
+const DEFAULT_PLOT_BANK_URL = 'http://103.8.115.199:91/test/survey/plot_bank.php';
+
+/**
+ * Housing portal plot bank (same JSON used by survey_data_v3.php dropdowns).
+ * Example: http://103.8.115.199:91/test/survey/plot_bank.php
+ */
+export function getPlotBankUrl(): string {
+  const trimmed = (PLOT_BANK_URL_RAW || '').trim();
+  if (trimmed) {
+    return trimmed.replace(/\/$/, '');
+  }
+  return DEFAULT_PLOT_BANK_URL;
 }
 
 const DEFAULT_LOGIN_URL =

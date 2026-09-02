@@ -40,13 +40,13 @@ export const APP_TOUR_STEPS: AppTourStep[] = [
     kind: 'welcome',
     title: 'Welcome to DFPS Site Visit',
     body:
-      'This short tour shows the two main things you will do in the app: record a site visit on-site, and send saved surveys to the server.',
+      'This short tour shows the main things you will do in the app: record a completion certificate visit or Property Seal on-site, and send saved CC surveys to the server.',
     icon: 'map-marker-check-outline',
   },
   {
     id: 'actions',
     kind: 'actions',
-    title: 'Your two main actions',
+    title: 'Your main actions',
     body: 'Use these from the Dashboard or open the menu (☰) at any time:',
     actions: [
       {
@@ -54,6 +54,12 @@ export const APP_TOUR_STEPS: AppTourStep[] = [
         description:
           'Start a completion certificate survey. Allow GPS, pick the case, record violations or a clear visit, then save.',
         icon: 'map-marker-check-outline',
+      },
+      {
+        title: 'Property Seal',
+        description:
+          'Record scheme, phase, block, plot, GPS, photos, and an enforcement activity from the housing portal.',
+        icon: 'home-search-outline',
       },
       {
         title: 'My Site Visits & Submissions',

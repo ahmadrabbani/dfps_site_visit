@@ -40,6 +40,11 @@ const MENU_ITEMS: MenuItem[] = [
     icon: 'map-marker-check-outline',
   },
   {
+    route: MAIN_STACK_ROUTES.CeilingInvestigation,
+    label: 'Property Seal',
+    icon: 'home-search-outline',
+  },
+  {
     route: MAIN_STACK_ROUTES.MySubmissions,
     label: 'My Submissions',
     icon: 'cloud-upload-outline',
@@ -103,7 +108,7 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
         });
         await new Promise<void>(resolve => setTimeout(resolve, 320));
 
-        if (screen === MAIN_STACK_ROUTES.SiteVisit) {
+        if (screen === MAIN_STACK_ROUTES.SiteVisit || screen === MAIN_STACK_ROUTES.CeilingInvestigation) {
           const allowed = await prepareSiteVisitLocation();
           if (!allowed) {
             return;
@@ -111,7 +116,10 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
         }
         navigation.navigate(DRAWER_ROUTES.Main, {
           screen,
-          params: screen === MAIN_STACK_ROUTES.SiteVisit ? {locationPrepared: true} : undefined,
+          params:
+            screen === MAIN_STACK_ROUTES.SiteVisit || screen === MAIN_STACK_ROUTES.CeilingInvestigation
+              ? {locationPrepared: true}
+              : undefined,
         });
       } finally {
         menuNavigatingRef.current = false;

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,6 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  AppState,
-  InteractionManager,
-  Platform,
-  type AppStateStatus,
 } from 'react-native';
 import {Icon} from 'react-native-paper';
 import {useQuery} from '@tanstack/react-query';
@@ -20,7 +16,9 @@ import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {USE_FAKE_API} from '../config/env';
 import {CC_MAX_FLOORS} from '../constants/ccSurvey';
 import {FormLabel} from '../components/FormLabel';
+import GpsLocationCard from '../components/GpsLocationCard';
 import PhotoPickerButtons from '../components/PhotoPickerButtons';
+import {useSiteVisitGps} from '../hooks/useSiteVisitGps';
 import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
@@ -28,21 +26,9 @@ import {fetchCaseList, type SessionUser} from '../services/api';
 import {queryKeys} from '../queries/queryKeys';
 import type {SiteVisitViolation} from '../services/storage';
 import type {CcSurveyCompletePayload, SetViolations, SiteScope, ViolationChoice} from '../types/app';
-import {acquireDeviceCoords, isGpsPermissionError, isGpsSettingsError} from '../utils/deviceLocation';
-import {
-  hasLocationPermission,
-  openAppSettings,
-  requestLocationPermission,
-  waitForAndroidLocationPermission,
-} from '../utils/locationPermission';
-import {isAndroidLocationPrepared} from '../utils/locationSession';
 import {notifyInfo} from '../utils/notify';
 
 const showTestGpsControls = typeof __DEV__ !== 'undefined' && __DEV__ && USE_FAKE_API;
-
-function formatCoord(value: number | null): string {
-  return value != null && Number.isFinite(value) ? value.toFixed(5) : '—';
-}
 
 interface SiteVisitScreenProps {
   user: SessionUser;
@@ -64,12 +50,18 @@ export default function SiteVisitScreen({
   onCompleteVisit,
   isSubmitting = false,
 }: SiteVisitScreenProps) {
-  const [gpsAllowed, setGpsAllowed] = useState(false);
-  const [gpsLoading, setGpsLoading] = useState(Platform.OS !== 'android');
-  const [gpsError, setGpsError] = useState<string | null>(null);
-  const [gpsPermissionDenied, setGpsPermissionDenied] = useState(false);
-  const [currentLat, setCurrentLat] = useState<number | null>(null);
-  const [currentLng, setCurrentLng] = useState<number | null>(null);
+  const {
+    gpsAllowed,
+    gpsLoading,
+    gpsError,
+    gpsPermissionDenied,
+    currentLat,
+    currentLng,
+    needsPermissionPrompt,
+    handleGetLocation,
+    startLocationFlow,
+    handleOpenLocationSettings,
+  } = useSiteVisitGps(locationPrepared);
   const [violations, setViolations] = useState<SiteVisitViolation[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [violationChoice, setViolationChoice] = useState<ViolationChoice>('');
@@ -77,222 +69,8 @@ export default function SiteVisitScreen({
   const [remarks, setRemarks] = useState('');
   const [siteSketchUri, setSiteSketchUri] = useState<string | null>(null);
   const [capturingSketch, setCapturingSketch] = useState(false);
-  const [needsPermissionPrompt, setNeedsPermissionPrompt] = useState(false);
   const [noOfFloorsFocused, setNoOfFloorsFocused] = useState(false);
   const [remarksFocused, setRemarksFocused] = useState(false);
-
-  const mountedRef = useRef(true);
-  const gpsRunIdRef = useRef(0);
-  const screenFocusedRef = useRef(false);
-  const awaitingReturnRef = useRef(false);
-  const permissionDialogOpenRef = useRef(false);
-  const locationPreparedRef = useRef(locationPrepared);
-
-  const androidPostPermissionDelay = () =>
-    Platform.OS === 'android'
-      ? new Promise<void>(resolve => setTimeout(resolve, 600))
-      : Promise.resolve();
-
-  const applyCoords = useCallback((lat: number, lng: number) => {
-    setCurrentLat(lat);
-    setCurrentLng(lng);
-    setGpsAllowed(true);
-    setGpsLoading(false);
-    setGpsError(null);
-    setGpsPermissionDenied(false);
-    setNeedsPermissionPrompt(false);
-  }, []);
-
-  const finishGpsFailure = useCallback(
-    (error: unknown) => {
-      setGpsAllowed(false);
-      setGpsLoading(false);
-      const permissionDenied = isGpsPermissionError(error);
-      const settingsIssue = isGpsSettingsError(error);
-      setGpsPermissionDenied(permissionDenied);
-      setNeedsPermissionPrompt(permissionDenied);
-      setGpsError(
-        error instanceof Error && error.message
-          ? error.message
-          : permissionDenied
-            ? 'Tap Get location below, then choose Allow in the system dialog.'
-            : settingsIssue
-              ? 'Turn on phone Location (GPS), then tap Retry GPS.'
-              : 'Could not read GPS. Tap Retry GPS or move to an open area.',
-      );
-    },
-    [],
-  );
-
-  const runGpsFetch = useCallback(
-    async (runId: number) => {
-      const isStale = () => !mountedRef.current || runId !== gpsRunIdRef.current;
-      try {
-        const coords = await acquireDeviceCoords();
-        if (isStale()) {
-          return;
-        }
-        applyCoords(coords.lat, coords.lng);
-      } catch (error) {
-        if (isStale()) {
-          return;
-        }
-        finishGpsFailure(error);
-      }
-    },
-    [applyCoords, finishGpsFailure],
-  );
-
-  const refreshGps = useCallback(
-    async (requestPermission: boolean) => {
-      const runId = ++gpsRunIdRef.current;
-      const isStale = () => !mountedRef.current || runId !== gpsRunIdRef.current;
-
-      setGpsLoading(true);
-      setGpsError(null);
-      setGpsPermissionDenied(false);
-      setNeedsPermissionPrompt(false);
-
-      let permitted = await hasLocationPermission();
-
-      if (
-        !permitted &&
-        Platform.OS === 'android' &&
-        (locationPreparedRef.current || isAndroidLocationPrepared())
-      ) {
-        permitted = await waitForAndroidLocationPermission(4500);
-      }
-
-      if (!permitted && requestPermission) {
-        permissionDialogOpenRef.current = true;
-        try {
-          permitted = await requestLocationPermission();
-          if (permitted && Platform.OS === 'android') {
-            permitted = await waitForAndroidLocationPermission(3500);
-          }
-        } finally {
-          permissionDialogOpenRef.current = false;
-        }
-      }
-
-      if (isStale()) {
-        setGpsLoading(false);
-        return;
-      }
-
-      if (!permitted) {
-        setGpsAllowed(false);
-        setGpsLoading(false);
-        setNeedsPermissionPrompt(true);
-        setGpsPermissionDenied(true);
-        setGpsError(
-          Platform.OS === 'android'
-            ? 'Tap Get location below, then choose Allow in the system dialog.'
-            : 'Tap Allow location below, then choose Allow in the system dialog.',
-        );
-        return;
-      }
-
-      if (Platform.OS === 'android') {
-        await androidPostPermissionDelay();
-        await new Promise<void>(resolve => {
-          InteractionManager.runAfterInteractions(() => resolve());
-        });
-      }
-
-      if (isStale()) {
-        setGpsLoading(false);
-        return;
-      }
-
-      await runGpsFetch(runId);
-    },
-    [runGpsFetch],
-  );
-
-  const handleOpenLocationSettings = useCallback(() => {
-    awaitingReturnRef.current = true;
-    openAppSettings();
-  }, []);
-
-  useEffect(() => {
-    locationPreparedRef.current = locationPrepared;
-  }, [locationPrepared]);
-
-  const startLocationFlow = useCallback(
-    (requestPermission: boolean) => {
-      void refreshGps(requestPermission);
-    },
-    [refreshGps],
-  );
-
-  const handleGetLocation = useCallback(async () => {
-    let permitted = await hasLocationPermission();
-    if (
-      !permitted &&
-      Platform.OS === 'android' &&
-      (locationPreparedRef.current || isAndroidLocationPrepared())
-    ) {
-      permitted = await waitForAndroidLocationPermission(2000);
-    }
-    startLocationFlow(!permitted);
-  }, [startLocationFlow]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    screenFocusedRef.current = true;
-
-    if (Platform.OS !== 'android') {
-      void refreshGps(true);
-      return () => {
-        mountedRef.current = false;
-        screenFocusedRef.current = false;
-        if (!permissionDialogOpenRef.current) {
-          gpsRunIdRef.current += 1;
-        }
-      };
-    }
-
-    setGpsLoading(false);
-    setGpsAllowed(false);
-    setGpsError(
-      locationPreparedRef.current || isAndroidLocationPrepared()
-        ? 'Tap Get location below to load GPS. No extra Allow needed if you already allowed on Dashboard.'
-        : 'Tap Get location below. Allow when Android asks (Precise or Approximate is OK).',
-    );
-    setNeedsPermissionPrompt(true);
-
-    return () => {
-      mountedRef.current = false;
-      screenFocusedRef.current = false;
-      if (!permissionDialogOpenRef.current) {
-        gpsRunIdRef.current += 1;
-      }
-    };
-  }, [locationPrepared, refreshGps]);
-
-  useEffect(() => {
-    const onAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState !== 'active' || !screenFocusedRef.current) {
-        return;
-      }
-      if (permissionDialogOpenRef.current) {
-        return;
-      }
-      if (awaitingReturnRef.current) {
-        awaitingReturnRef.current = false;
-        if (!gpsAllowed) {
-          void refreshGps(false);
-        }
-        return;
-      }
-      if (Platform.OS !== 'android' && !gpsAllowed && !gpsLoading) {
-        void refreshGps(false);
-      }
-    };
-    const subscription = AppState.addEventListener('change', onAppStateChange);
-    return () => subscription.remove();
-  }, [gpsAllowed, gpsLoading, refreshGps]);
 
   const plotCategoryLabel = siteScope === 'commercial' ? 'Commercial' : 'Residential';
 
@@ -472,70 +250,18 @@ export default function SiteVisitScreen({
           Officer: <Text style={styles.officerName}>{user.name}</Text>
         </Text>
       </View>
-      <View style={styles.locationSection}>
-        <View style={styles.locationCard}>
-          <View style={styles.locationCardHeader}>
-            <Icon
-              source={gpsAllowed ? 'map-marker' : 'map-marker-off'}
-              size={22}
-              color={gpsLoading ? colors.mutedText : gpsAllowed ? colors.success : colors.danger}
-            />
-            <Text style={styles.locationTitle}>
-              {gpsLoading
-                ? 'Acquiring GPS location...'
-                : gpsAllowed
-                  ? 'GPS Location Ready'
-                  : needsPermissionPrompt
-                    ? 'Location required'
-                    : 'GPS Signal Offline'}
-            </Text>
-          </View>
-          
-          {gpsAllowed && currentLat != null && currentLng != null ? (
-            <View style={styles.coordinatesContainer}>
-              <View style={styles.coordinateBlock}>
-                <Text style={styles.coordinateLabel}>LATITUDE</Text>
-                <Text style={styles.coordinateValue}>{formatCoord(currentLat)}</Text>
-              </View>
-              <View style={styles.coordinateDivider} />
-              <View style={styles.coordinateBlock}>
-                <Text style={styles.coordinateLabel}>LONGITUDE</Text>
-                <Text style={styles.coordinateValue}>{formatCoord(currentLng)}</Text>
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.locationError}>
-              {gpsError || 'Tap Get location below to record GPS for this survey.'}
-            </Text>
-          )}
-
-          {!gpsLoading && !gpsAllowed ? (
-            <View style={styles.locationActionRow}>
-              <TouchableOpacity
-                style={styles.locationRetryBtn}
-                onPress={() => void handleGetLocation()}>
-                <Icon source="map-marker-radius" size={16} color="#ffffff" />
-                <Text style={styles.locationRetryBtnText}>Get location</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.locationRetryBtn, styles.locationRetryBtnSecondary]}
-                onPress={() => startLocationFlow(false)}>
-                <Icon source="refresh" size={16} color={colors.primary} />
-                <Text style={[styles.locationRetryBtnText, styles.locationRetryBtnTextSecondary]}>
-                  Retry GPS
-                </Text>
-              </TouchableOpacity>
-              {gpsPermissionDenied ? (
-                <TouchableOpacity
-                  style={styles.locationSettingsBtn}
-                  onPress={handleOpenLocationSettings}>
-                  <Text style={styles.locationSettingsBtnText}>Open Settings</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      </View>
+      <GpsLocationCard
+        gpsAllowed={gpsAllowed}
+        gpsLoading={gpsLoading}
+        gpsError={gpsError}
+        gpsPermissionDenied={gpsPermissionDenied}
+        currentLat={currentLat}
+        currentLng={currentLng}
+        needsPermissionPrompt={needsPermissionPrompt}
+        onGetLocation={() => void handleGetLocation()}
+        onRetryGps={() => startLocationFlow(false)}
+        onOpenSettings={handleOpenLocationSettings}
+      />
 
       {showTestGpsControls ? (
         <Text style={styles.siteInfo}>Test mode active (fake API enabled).</Text>
@@ -823,110 +549,6 @@ const styles = StyleSheet.create({
   officerName: {
     fontWeight: '800',
     color: colors.primary,
-  },
-  locationSection: {
-    marginTop: 10,
-  },
-  locationCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginTop: 6,
-  },
-  locationCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  locationTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.text,
-    marginLeft: 8,
-  },
-  coordinatesContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
-  },
-  coordinateBlock: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  coordinateLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.mutedText,
-    letterSpacing: 1,
-  },
-  coordinateValue: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.success,
-    marginTop: 4,
-  },
-  coordinateDivider: {
-    width: 1,
-    height: 32,
-    backgroundColor: '#cbd5e1',
-  },
-  locationError: {
-    fontSize: 12,
-    color: colors.mutedText,
-    lineHeight: 18,
-  },
-  locationActionRow: {
-    flexDirection: 'row',
-    marginTop: 12,
-    gap: 8,
-  },
-  locationRetryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primaryLight,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  locationRetryBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  locationRetryBtnSecondary: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: colors.primaryLight,
-  },
-  locationRetryBtnTextSecondary: {
-    color: colors.primary,
-  },
-  locationSettingsBtn: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  locationSettingsBtnText: {
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '600',
   },
   siteInfo: {fontSize: 13, color: colors.mutedText, marginTop: 2},
   helper: {fontSize: 12, color: colors.mutedText, marginTop: 8, lineHeight: 17},

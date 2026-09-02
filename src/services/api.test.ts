@@ -6,6 +6,7 @@ jest.mock('../config/env', () => ({
   getCcApplicationListUrl: () => 'http://test.example/cc_application_list.php',
   getCcPortalSubmitUrl: () => 'http://test.example/conf_add.php',
   getCcSurveyUrl: () => 'http://test.example/forward.php',
+  getPlotBankUrl: () => 'http://test.example/plot_bank.php',
   getSurveyApiSecret: () => 'secret',
   USE_FAKE_API: false,
 }));

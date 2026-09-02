@@ -11,6 +11,7 @@ import AppHeader from '../components/AppHeader';
 import {colors} from '../theme/colors';
 import DashboardScreen from '../screens/DashboardScreen';
 import SiteVisitScreen from '../screens/SiteVisitScreen';
+import CeilingInvestigationScreen from '../screens/CeilingInvestigationScreen';
 import ViolationFormScreen from '../screens/ViolationFormScreen';
 import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
@@ -33,9 +34,10 @@ function DashboardRouteScreen() {
   const navigation = useNavigation<any>();
   const {user, setSiteScope} = useAuthNavigation();
   const [startingVisit, setStartingVisit] = useState(false);
+  const [startingCeiling, setStartingCeiling] = useState(false);
 
   const handleStartVisit = async () => {
-    if (startingVisit) {
+    if (startingVisit || startingCeiling) {
       return;
     }
     setStartingVisit(true);
@@ -50,12 +52,29 @@ function DashboardRouteScreen() {
     }
   };
 
+  const handleStartCeiling = async () => {
+    if (startingVisit || startingCeiling) {
+      return;
+    }
+    setStartingCeiling(true);
+    try {
+      const allowed = await prepareSiteVisitLocation();
+      if (allowed) {
+        navigation.navigate(MAIN_STACK_ROUTES.CeilingInvestigation, {locationPrepared: true});
+      }
+    } finally {
+      setStartingCeiling(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <DashboardScreen
         user={user}
         startingVisit={startingVisit}
+        startingCeiling={startingCeiling}
         onStartVisit={() => void handleStartVisit()}
+        onStartCeiling={() => void handleStartCeiling()}
       />
     </SafeAreaView>
   );
@@ -82,6 +101,25 @@ function SiteVisitRouteScreen() {
         }}
         onCompleteVisit={survey => {
           submitVisit.mutate({user, survey});
+        }}
+      />
+    </SafeAreaView>
+  );
+}
+
+function CeilingInvestigationRouteScreen() {
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const {user} = useAuthNavigation();
+  const locationPrepared = route.params?.locationPrepared === true;
+
+  return (
+    <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
+      <CeilingInvestigationScreen
+        user={user}
+        locationPrepared={locationPrepared}
+        onSaved={() => {
+          navigation.reset({index: 0, routes: [{name: MAIN_STACK_ROUTES.Dashboard}]});
         }}
       />
     </SafeAreaView>
@@ -160,6 +198,10 @@ function MainStack() {
       }}>
       <Stack.Screen name={MAIN_STACK_ROUTES.Dashboard} component={DashboardRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.SiteVisit} component={SiteVisitRouteScreen} />
+      <Stack.Screen
+        name={MAIN_STACK_ROUTES.CeilingInvestigation}
+        component={CeilingInvestigationRouteScreen}
+      />
       <Stack.Screen name={MAIN_STACK_ROUTES.ViolationForm} component={ViolationFormRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.Summary} component={SummaryRouteScreen} />
       <Stack.Screen name={MAIN_STACK_ROUTES.MySubmissions} component={MySubmissionsRouteScreen} />

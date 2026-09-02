@@ -12,6 +12,7 @@ import {MAIN_STACK_ROUTES} from '../navigation/routeNames';
 const TITLES: Record<string, string> = {
   [MAIN_STACK_ROUTES.Dashboard]: 'Dashboard',
   [MAIN_STACK_ROUTES.SiteVisit]: 'Completion Certificate Site Visit',
+  [MAIN_STACK_ROUTES.CeilingInvestigation]: 'Property Seal',
   [MAIN_STACK_ROUTES.ViolationForm]: 'Violation',
   [MAIN_STACK_ROUTES.Summary]: 'Summary',
   [MAIN_STACK_ROUTES.MySubmissions]: 'My Site Visits & Submissions',
