@@ -11,6 +11,7 @@ export function invalidateVisitCaches(
   options: InvalidateVisitCachesOptions = {},
 ): void {
   void queryClient.invalidateQueries({queryKey: queryKeys.pendingVisits});
+  void queryClient.invalidateQueries({queryKey: queryKeys.pendingPropertySealVisits});
 
   if (options.serverPushSucceeded) {
     void queryClient.invalidateQueries({queryKey: queryKeys.ccCasesPrefix});

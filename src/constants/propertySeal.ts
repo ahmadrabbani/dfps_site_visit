@@ -21,7 +21,16 @@ export const PROPERTY_SEAL_FLOW_TITLE = 'Property Seal & Deseal';
 export const PROPERTY_SEAL_TITLE = 'Property Seal';
 export const PROPERTY_DESEAL_TITLE = 'Property Deseal';
 
+/** Form kind picker (maps to portal action_type sealed / de-sealing). */
+export const PROPERTY_SEAL_KINDS = [
+  {value: 'seal' as const, label: PROPERTY_SEAL_TITLE, activityValue: '4'},
+  {value: 'deseal' as const, label: PROPERTY_DESEAL_TITLE, activityValue: '5'},
+];
+
 /** Seal form omits De-sealing — that is its own flow. */
 export const SEAL_ACTIVITIES = PROPERTY_SEAL_ACTIVITIES.filter(item => item.value !== '5');
 
 export const PROPERTY_SEAL_MAX_PHOTOS = 8;
+
+/** Reject GPS fixes worse than this accuracy (meters). */
+export const PROPERTY_SEAL_MAX_GPS_ACCURACY_M = 50;

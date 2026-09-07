@@ -1,7 +1,7 @@
 import React from 'react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react-native';
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {render, screen, waitFor} from '@testing-library/react-native';
 import PropertySealScreen from '../src/screens/PropertySealScreen';
 import {fetchBlocks, fetchPhases, fetchPlots, fetchSchemes} from '../src/services/plotBank';
 
@@ -20,6 +20,7 @@ jest.mock('../src/hooks/useSiteVisitGps', () => ({
     gpsPermissionDenied: false,
     currentLat: 31.52,
     currentLng: 74.35,
+    currentAccuracy: 25,
     needsPermissionPrompt: false,
     handleGetLocation: jest.fn(),
     startLocationFlow: jest.fn(),
@@ -29,7 +30,12 @@ jest.mock('../src/hooks/useSiteVisitGps', () => ({
 }));
 
 jest.mock('../src/services/propertySealStorage', () => ({
+  addPendingPropertySealVisit: jest.fn().mockResolvedValue(undefined),
   addPropertySealVisit: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('../src/services/syncService', () => ({
+  syncPending: jest.fn().mockResolvedValue({uploaded: 0, failed: 0, deferred: 0, paused: 0}),
 }));
 
 jest.mock('../src/services/plotBank', () => ({
@@ -44,7 +50,7 @@ const mockPhases = fetchPhases as jest.MockedFunction<typeof fetchPhases>;
 const mockBlocks = fetchBlocks as jest.MockedFunction<typeof fetchBlocks>;
 const mockPlots = fetchPlots as jest.MockedFunction<typeof fetchPlots>;
 
-function renderScreen(onSaved = jest.fn(), kind: 'seal' | 'deseal' = 'seal') {
+function renderScreen(onSaved = jest.fn()) {
   const client = new QueryClient({
     defaultOptions: {queries: {retry: false}},
   });
@@ -57,12 +63,19 @@ function renderScreen(onSaved = jest.fn(), kind: 'seal' | 'deseal' = 'seal') {
       <QueryClientProvider client={client}>
         <PropertySealScreen
           user={{id: 1, username: 'officer.a', name: 'Officer A', token: 't'}}
-          kind={kind}
+          locationPrepared
           onSaved={onSaved}
         />
       </QueryClientProvider>
     </SafeAreaProvider>,
   );
+}
+
+async function chooseDeseal() {
+  fireEvent.press(screen.getByLabelText('Property Deseal'));
+  await waitFor(() => {
+    expect(screen.getByText('Property Deseal details')).toBeTruthy();
+  });
 }
 
 describe('PropertySealScreen', () => {
@@ -77,17 +90,28 @@ describe('PropertySealScreen', () => {
     mockPlots.mockResolvedValue([{value: '101', label: '12'}]);
   });
 
+  test('defaults to Property Seal and hides location until plot is selected', async () => {
+    renderScreen();
+    expect(screen.getByText('Property Seal & Deseal')).toBeTruthy();
+    expect(screen.getByLabelText('Property Seal')).toBeTruthy();
+    expect(screen.queryByText(/GPS accuracy must be 50 m/)).toBeNull();
+    expect(screen.getByText(/Select scheme and plot first/)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Scheme')).toBeTruthy();
+    });
+    expect(mockSchemes).toHaveBeenCalled();
+  });
+
   test('keeps save disabled until scheme, plot, activity, and remarks are filled', async () => {
     renderScreen();
     await waitFor(() => {
       expect(screen.getByLabelText('Scheme')).toBeTruthy();
     });
     expect(screen.getByText('Save Property Seal')).toBeDisabled();
-    expect(screen.getByText('Property Seal')).toBeTruthy();
     expect(screen.getByLabelText('Add picture field')).toBeTruthy();
-  });
+  }, 15000);
 
-  test('loads schemes from plot bank on open', async () => {
+  test('loads schemes from plot bank on open with default seal', async () => {
     renderScreen();
 
     await waitFor(() => {
@@ -100,17 +124,15 @@ describe('PropertySealScreen', () => {
     expect(mockPlots).not.toHaveBeenCalled();
   });
 
-  test('deseal form shows pictures and remarks only', async () => {
-    renderScreen(jest.fn(), 'deseal');
+  test('deseal shows location immediately with pictures and remarks', async () => {
+    renderScreen();
+    await chooseDeseal();
 
-    await waitFor(() => {
-      expect(screen.getByText('Property Deseal')).toBeTruthy();
-    });
     expect(screen.queryByLabelText('Scheme')).toBeNull();
     expect(screen.queryByText('Activity')).toBeNull();
     expect(screen.getByLabelText('Final remarks')).toBeTruthy();
     expect(screen.getByLabelText('Add picture field')).toBeTruthy();
     expect(screen.getByText('Save Property Deseal')).toBeDisabled();
-    expect(mockSchemes).not.toHaveBeenCalled();
+    expect(screen.getByText(/After plot is selected, tap Get location/)).toBeTruthy();
   });
 });

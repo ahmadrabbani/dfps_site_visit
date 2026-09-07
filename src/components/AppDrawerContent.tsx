@@ -17,7 +17,6 @@ import {getAppHeaderHeight} from '../theme/screenLayout';
 import {usePendingVisitCount, usePendingVisitsQuery} from '../hooks/usePendingVisitsQuery';
 import {useSyncPendingMutation} from '../hooks/useSyncPendingMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
-import {promptPropertySealKind} from '../utils/promptPropertySealKind';
 import {useAppTour} from '../context/AppTourContext';
 import ConnectionStatusDot from './ConnectionStatusDot';
 
@@ -115,30 +114,9 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
             return;
           }
         }
-        let propertySealParams: {locationPrepared?: boolean; kind?: 'seal' | 'deseal'} | undefined;
-        if (screen === MAIN_STACK_ROUTES.PropertySeal) {
-          const kind = await promptPropertySealKind();
-          if (!kind) {
-            return;
-          }
-          if (kind === 'seal') {
-            const allowed = await prepareSiteVisitLocation();
-            if (!allowed) {
-              return;
-            }
-            propertySealParams = {locationPrepared: true, kind};
-          } else {
-            propertySealParams = {locationPrepared: false, kind};
-          }
-        }
         navigation.navigate(DRAWER_ROUTES.Main, {
           screen,
-          params:
-            screen === MAIN_STACK_ROUTES.SiteVisit
-              ? {locationPrepared: true}
-              : screen === MAIN_STACK_ROUTES.PropertySeal
-                ? propertySealParams
-                : undefined,
+          params: screen === MAIN_STACK_ROUTES.SiteVisit ? {locationPrepared: true} : undefined,
         });
       } finally {
         menuNavigatingRef.current = false;

@@ -6,6 +6,12 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "30.0.14904198"
         kotlinVersion = "2.1.20"
+        // react-native-geolocation-service reads this via safeExtGet() so the library
+        // COMPILES against the same play-services-location the app RUNS against.
+        // Without it, the library compiles against 18.0.0 (FusedLocationProviderClient
+        // as a class) while runtime resolves 21.x (interface) -> IncompatibleClassChangeError
+        // crash on Get location (Property Seal).
+        playServicesLocationVersion = "21.3.0"
     }
     repositories {
         google()

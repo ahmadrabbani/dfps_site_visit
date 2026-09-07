@@ -1,0 +1,8 @@
+﻿cmd : 
+At C:\Users\HP\AppData\Local\Temp\ps-script-76fe3f2f-c8f4-4c36-99b1-3a6c1243d43c.ps1:87 char:262
++ ... binary---"; cmd /c "C:\Users\HP\AppData\Local\Android\Sdk\cmdline-too ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ERROR: Found multiple arguments for option [arguments], but you asked for only one

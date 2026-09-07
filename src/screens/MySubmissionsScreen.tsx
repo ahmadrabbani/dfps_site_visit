@@ -16,7 +16,19 @@ import {
   type PendingVisit,
   type SubmittedVisitRecord,
 } from '../services/storage';
-import {retryFailedNow, syncPending, syncVisitById} from '../services/syncService';
+import {
+  getPendingPropertySealVisits,
+  getSubmittedPropertySealVisits,
+  type PropertySealPendingVisit,
+  type PropertySealSubmittedVisit,
+} from '../services/propertySealStorage';
+import {
+  retryFailedNow,
+  syncPending,
+  syncPropertySealVisitById,
+  syncVisitById,
+} from '../services/syncService';
+import {PROPERTY_DESEAL_TITLE, PROPERTY_SEAL_TITLE} from '../constants/propertySeal';
 import {uploadCopy} from '../constants/uploadCopy';
 import {colors} from '../theme/colors';
 import {screenContentPadding} from '../theme/screenLayout';
@@ -29,6 +41,26 @@ function formatDate(iso?: string) {
   }
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+}
+
+function sealTitle(kind: string) {
+  return kind === 'deseal' ? PROPERTY_DESEAL_TITLE : PROPERTY_SEAL_TITLE;
+}
+
+function formatPropertySealPreview(item: PropertySealPendingVisit | PropertySealSubmittedVisit): string[] {
+  return [
+    `kind=${item.kind}`,
+    `scheme=${item.scheme || '-'}`,
+    `phase=${item.phase || '-'}`,
+    `block=${item.block || '-'}`,
+    `plot=${item.plot || '-'}`,
+    `action_type=${item.activityValue || '-'}`,
+    `action_label=${item.activityLabel || '-'}`,
+    `lat=${item.lat ?? '-'}`,
+    `lng=${item.lng ?? '-'}`,
+    `photos=${item.photoUris.length}`,
+    `remarks=${(item.finalRemarks || '').slice(0, 80)}`,
+  ];
 }
 
 function SubmissionCard({
@@ -98,16 +130,27 @@ function SubmissionCard({
 export default function MySubmissionsScreen() {
   const [submitted, setSubmitted] = useState<SubmittedVisitRecord[]>([]);
   const [pending, setPending] = useState<PendingVisit[]>([]);
+  const [sealSubmitted, setSealSubmitted] = useState<PropertySealSubmittedVisit[]>([]);
+  const [sealPending, setSealPending] = useState<PropertySealPendingVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [pushingId, setPushingId] = useState<string | null>(null);
 
+  const totalPending = pending.length + sealPending.length;
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [uploadedList, pendingList] = await Promise.all([getSubmittedVisits(), getPendingVisits()]);
+      const [uploadedList, pendingList, sealUploadedList, sealPendingList] = await Promise.all([
+        getSubmittedVisits(),
+        getPendingVisits(),
+        getSubmittedPropertySealVisits(),
+        getPendingPropertySealVisits(),
+      ]);
       setSubmitted(uploadedList);
       setPending(pendingList);
+      setSealSubmitted(sealUploadedList);
+      setSealPending(sealPendingList);
     } finally {
       setLoading(false);
     }
@@ -160,6 +203,19 @@ export default function MySubmissionsScreen() {
     }
   };
 
+  const handlePushSealOne = async (localId: string) => {
+    setPushingId(localId);
+    try {
+      const result = await syncPropertySealVisitById(localId);
+      if (result.uploaded > 0) {
+        notifySuccess(uploadCopy.pushedToServer);
+      }
+      await refresh();
+    } finally {
+      setPushingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -168,16 +224,20 @@ export default function MySubmissionsScreen() {
     );
   }
 
+  const showRetry =
+    pending.some(v => v.paused || (v.retryCount || 0) > 0) ||
+    sealPending.some(v => v.paused || (v.retryCount || 0) > 0);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.header}>My Site Visits & Submissions</Text>
       <Text style={styles.lead}>
-        {pending.length > 0
+        {totalPending > 0
           ? uploadCopy.submissionsLeadWithPending
           : uploadCopy.submissionsLeadNoPending}
       </Text>
 
-      {pending.length > 0 ? (
+      {totalPending > 0 ? (
         <View style={styles.actions}>
           <TouchableOpacity
             style={[styles.primaryBtn, syncing && styles.btnDisabled]}
@@ -189,7 +249,7 @@ export default function MySubmissionsScreen() {
               <Text style={styles.primaryBtnText}>{uploadCopy.pushAllPending}</Text>
             )}
           </TouchableOpacity>
-          {pending.some(v => v.paused || (v.retryCount || 0) > 0) ? (
+          {showRetry ? (
             <TouchableOpacity
               style={[styles.secondaryBtn, syncing && styles.btnDisabled]}
               disabled={syncing}
@@ -200,9 +260,9 @@ export default function MySubmissionsScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Uploaded ({submitted.length})</Text>
+      <Text style={styles.sectionTitle}>CC site visits — uploaded ({submitted.length})</Text>
       {submitted.length === 0 ? (
-        <Text style={styles.empty}>No uploaded surveys yet.</Text>
+        <Text style={styles.empty}>No uploaded CC surveys yet.</Text>
       ) : (
         submitted.map(item => (
           <SubmissionCard
@@ -221,9 +281,11 @@ export default function MySubmissionsScreen() {
         ))
       )}
 
-      <Text style={styles.sectionTitle}>Saved on device — not on server yet ({pending.length})</Text>
+      <Text style={styles.sectionTitle}>
+        CC site visits — saved on device ({pending.length})
+      </Text>
       {pending.length === 0 ? (
-        <Text style={styles.empty}>All saved site visits are on the server.</Text>
+        <Text style={styles.empty}>All saved CC site visits are on the server.</Text>
       ) : (
         pending.map(item => (
           <SubmissionCard
@@ -239,10 +301,62 @@ export default function MySubmissionsScreen() {
             ].filter(Boolean)}
             apiFields={formatForwardCcSurveyPreview(item)}
             status={item.paused ? 'Failed' : 'Not on server'}
-            statusTone={item.paused ? 'warning' : 'warning'}
+            statusTone="warning"
             imageUri={item.mainImageUri}
             actionLabel={pushingId === item.localId ? uploadCopy.pushingOne : uploadCopy.pushOneNow}
             onAction={() => handlePushOne(item.localId)}
+            actionDisabled={syncing || pushingId != null}
+          />
+        ))
+      )}
+
+      <Text style={styles.sectionTitle}>
+        Property Seal / Deseal — uploaded ({sealSubmitted.length})
+      </Text>
+      {sealSubmitted.length === 0 ? (
+        <Text style={styles.empty}>No uploaded Property Seal / Deseal surveys yet.</Text>
+      ) : (
+        sealSubmitted.map(item => (
+          <SubmissionCard
+            key={item.localId}
+            title={sealTitle(item.kind)}
+            subtitle={[item.plot, item.activityLabel].filter(Boolean).join(' · ') || item.kind}
+            meta={[
+              `Pushed: ${formatDate(item.uploadedAt)}`,
+              item.serverMessage ? `Server: ${item.serverMessage}` : '',
+            ].filter(Boolean)}
+            apiFields={formatPropertySealPreview(item)}
+            status="On server"
+            statusTone="success"
+            imageUri={item.photoUris[0] || null}
+          />
+        ))
+      )}
+
+      <Text style={styles.sectionTitle}>
+        Property Seal / Deseal — saved on device ({sealPending.length})
+      </Text>
+      {sealPending.length === 0 ? (
+        <Text style={styles.empty}>All saved Property Seal / Deseal surveys are on the server.</Text>
+      ) : (
+        sealPending.map(item => (
+          <SubmissionCard
+            key={item.localId}
+            notSubmitted
+            title={sealTitle(item.kind)}
+            subtitle={[item.plot, item.activityLabel].filter(Boolean).join(' · ') || item.kind}
+            meta={[
+              `Saved: ${formatDate(item.savedAt)}`,
+              item.paused
+                ? `Last error: ${item.lastError || 'Upload paused'}`
+                : 'Ready to send to server',
+            ].filter(Boolean)}
+            apiFields={formatPropertySealPreview(item)}
+            status={item.paused ? 'Failed' : 'Not on server'}
+            statusTone="warning"
+            imageUri={item.photoUris[0] || null}
+            actionLabel={pushingId === item.localId ? uploadCopy.pushingOne : uploadCopy.pushOneNow}
+            onAction={() => handlePushSealOne(item.localId)}
             actionDisabled={syncing || pushingId != null}
           />
         ))

@@ -17,7 +17,6 @@ import SummaryScreen from '../screens/SummaryScreen';
 import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 import {useSubmitSiteVisitMutation} from '../hooks/useSubmitSiteVisitMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
-import {promptPropertySealKind} from '../utils/promptPropertySealKind';
 import AppTourModal from '../components/AppTourModal';
 import {AppTourProvider} from '../context/AppTourContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from './routeNames';
@@ -65,25 +64,7 @@ function DashboardRouteScreen() {
     }
     setStartingPropertySeal(true);
     try {
-      const kind = await promptPropertySealKind();
-      if (!kind) {
-        return;
-      }
-      if (kind === 'seal') {
-        const allowed = await prepareSiteVisitLocation();
-        if (!allowed) {
-          return;
-        }
-        navigation.navigate(MAIN_STACK_ROUTES.PropertySeal, {
-          locationPrepared: true,
-          kind,
-        });
-        return;
-      }
-      navigation.navigate(MAIN_STACK_ROUTES.PropertySeal, {
-        locationPrepared: false,
-        kind,
-      });
+      navigation.navigate(MAIN_STACK_ROUTES.PropertySeal);
     } finally {
       setStartingPropertySeal(false);
     }
@@ -134,13 +115,11 @@ function PropertySealRouteScreen() {
   const route = useRoute<any>();
   const {user} = useAuthNavigation();
   const locationPrepared = route.params?.locationPrepared === true;
-  const kind = route.params?.kind === 'deseal' ? 'deseal' : 'seal';
 
   return (
     <SafeAreaView style={styles.fill} edges={['bottom', 'left', 'right']}>
       <PropertySealScreen
         user={user}
-        kind={kind}
         locationPrepared={locationPrepared}
         onSaved={() => {
           navigation.reset({index: 0, routes: [{name: MAIN_STACK_ROUTES.Dashboard}]});

@@ -15,6 +15,9 @@ export const CC_APPLICATION_LIST_URL_RAW = Config.CC_APPLICATION_LIST_URL ?? '';
 /** plot_bank.php (scheme / phase / block / plot lists). */
 export const PLOT_BANK_URL_RAW = Config.PLOT_BANK_URL ?? '';
 
+/** Property Seal / Deseal upload endpoint (multipart). Empty = keep on device until configured. */
+export const PROPERTY_SEAL_SURVEY_URL_RAW = Config.PROPERTY_SEAL_SURVEY_URL ?? '';
+
 /** Legacy tbllogin script (full URL to login handler PHP). */
 export const LOGIN_URL_RAW = Config.LOGIN_URL ?? '';
 
@@ -100,6 +103,15 @@ export function getPlotBankUrl(): string {
     return trimmed.replace(/\/$/, '');
   }
   return DEFAULT_PLOT_BANK_URL;
+}
+
+/**
+ * Property Seal / Deseal survey POST URL.
+ * Leave unset until the live portal handler is confirmed — visits stay pending locally.
+ */
+export function getPropertySealSurveyUrl(): string | null {
+  const trimmed = (PROPERTY_SEAL_SURVEY_URL_RAW || '').trim();
+  return trimmed ? trimmed.replace(/\/$/, '') : null;
 }
 
 const DEFAULT_LOGIN_URL =

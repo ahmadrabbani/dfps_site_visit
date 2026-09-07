@@ -11,31 +11,38 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {Icon} from 'react-native-paper';
-import {useQuery} from '@tanstack/react-query';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {FormLabel} from '../components/FormLabel';
 import GpsLocationCard from '../components/GpsLocationCard';
+import GpsDebugPanel from '../components/GpsDebugPanel';
 import LookupSelect from '../components/LookupSelect';
 import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {
   PROPERTY_DESEAL_TITLE,
+  PROPERTY_SEAL_FLOW_TITLE,
+  PROPERTY_SEAL_KINDS,
+  PROPERTY_SEAL_MAX_GPS_ACCURACY_M,
   PROPERTY_SEAL_MAX_PHOTOS,
   PROPERTY_SEAL_TITLE,
   SEAL_ACTIVITIES,
+  type PropertySealActivityValue,
 } from '../constants/propertySeal';
 import {useSiteVisitGps} from '../hooks/useSiteVisitGps';
+import {invalidateVisitCaches} from '../queries/invalidateVisitCaches';
 import {queryKeys} from '../queries/queryKeys';
-import {addPropertySealVisit} from '../services/propertySealStorage';
-import {fetchBlocks, fetchPhases, fetchPlots, fetchSchemes} from '../services/plotBank';
 import type {SessionUser} from '../services/api';
+import {addPendingPropertySealVisit, type PropertySealVisitKind} from '../services/propertySealStorage';
+import {fetchBlocks, fetchPhases, fetchPlots, fetchSchemes} from '../services/plotBank';
+import {syncPending} from '../services/syncService';
 import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
-import {notifySuccess} from '../utils/notify';
+import {notifySuccess, notifyWarning} from '../utils/notify';
+import {gpsDebugLog} from '../utils/gpsDebugLog';
 
 interface PropertySealScreenProps {
   user: SessionUser;
-  kind?: 'seal' | 'deseal';
   locationPrepared?: boolean;
   onSaved: () => void;
 }
@@ -47,18 +54,20 @@ interface PhotoSlot {
 
 export default function PropertySealScreen({
   user,
-  kind = 'seal',
   locationPrepared = false,
   onSaved,
 }: PropertySealScreenProps) {
+  const queryClient = useQueryClient();
+  const [kind, setKind] = useState<PropertySealVisitKind>('seal');
+  const isSeal = kind === 'seal';
   const isDeseal = kind === 'deseal';
-  const gps = useSiteVisitGps(locationPrepared && !isDeseal);
+
   const [scheme, setScheme] = useState('');
   const [phase, setPhase] = useState('');
   const [block, setBlock] = useState('');
   const [plotId, setPlotId] = useState('');
   const [plotLabel, setPlotLabel] = useState('');
-  const [activityValue, setActivityValue] = useState('');
+  const [activityValue, setActivityValue] = useState('4');
   const [finalRemarks, setFinalRemarks] = useState('');
   const photoIdRef = useRef(1);
   const [photoSlots, setPhotoSlots] = useState<PhotoSlot[]>([{id: 'slot-1', uri: null}]);
@@ -66,28 +75,36 @@ export default function PropertySealScreen({
   const [saving, setSaving] = useState(false);
   const [remarksFocused, setRemarksFocused] = useState(false);
 
+  const canShowLocation = isDeseal || (isSeal && plotLabel.trim().length > 0);
+
+  const gps = useSiteVisitGps(false, {
+    stayInApp: true,
+    enabled: canShowLocation,
+    debugTag: 'PropertySeal',
+  });
+
   const schemesQuery = useQuery({
     queryKey: queryKeys.plotSchemes,
     queryFn: fetchSchemes,
-    enabled: !isDeseal,
+    enabled: isSeal,
     staleTime: 10 * 60 * 1000,
   });
   const phasesQuery = useQuery({
     queryKey: queryKeys.plotPhases(scheme),
     queryFn: () => fetchPhases(scheme),
-    enabled: !isDeseal && Boolean(scheme),
+    enabled: isSeal && Boolean(scheme),
     staleTime: 10 * 60 * 1000,
   });
   const blocksQuery = useQuery({
     queryKey: queryKeys.plotBlocks(scheme, phase),
     queryFn: () => fetchBlocks(scheme, phase),
-    enabled: !isDeseal && Boolean(scheme && phase),
+    enabled: isSeal && Boolean(scheme && phase),
     staleTime: 10 * 60 * 1000,
   });
   const plotsQuery = useQuery({
     queryKey: queryKeys.plotPlots(scheme, phase, block),
     queryFn: () => fetchPlots(scheme, phase, block),
-    enabled: !isDeseal && Boolean(scheme && phase && block),
+    enabled: isSeal && Boolean(scheme && phase && block),
     staleTime: 10 * 60 * 1000,
   });
 
@@ -101,16 +118,33 @@ export default function PropertySealScreen({
     [photoSlots],
   );
 
-  const canSave = isDeseal
-    ? photoUris.length > 0 && finalRemarks.trim().length > 0 && !saving
-    : gps.gpsAllowed &&
-      gps.currentLat != null &&
-      gps.currentLng != null &&
-      scheme.trim().length > 0 &&
-      plotLabel.trim().length > 0 &&
-      Boolean(activityValue) &&
-      finalRemarks.trim().length > 0 &&
-      !saving;
+  const gpsReady =
+    gps.gpsAllowed &&
+    gps.currentLat != null &&
+    gps.currentLng != null &&
+    (gps.currentAccuracy == null || gps.currentAccuracy <= PROPERTY_SEAL_MAX_GPS_ACCURACY_M);
+
+  const canSave = Boolean(kind) &&
+    gpsReady &&
+    finalRemarks.trim().length > 0 &&
+    !saving &&
+    (isDeseal
+      ? photoUris.length > 0
+      : scheme.trim().length > 0 && plotLabel.trim().length > 0 && Boolean(activityValue));
+
+  const selectKind = (next: PropertySealVisitKind) => {
+    gpsDebugLog('PropertySeal', 'selectKind', {next, previous: kind});
+    setKind(next);
+    setScheme('');
+    setPhase('');
+    setBlock('');
+    setPlotId('');
+    setPlotLabel('');
+    setActivityValue(next === 'seal' ? '4' : '5');
+    setFinalRemarks('');
+    photoIdRef.current = 1;
+    setPhotoSlots([{id: 'slot-1', uri: null}]);
+  };
 
   const pickPhotoForSlot = async (slotId: string, useCamera: boolean) => {
     setCapturingPhoto(true);
@@ -166,40 +200,66 @@ export default function PropertySealScreen({
   };
 
   const handleSave = async () => {
-    if (isDeseal) {
-      if (!canSave) {
-        Alert.alert('Incomplete form', 'At least one picture and remarks are required before saving.');
-        return;
-      }
-    } else if (!canSave || gps.currentLat == null || gps.currentLng == null || !selectedActivity) {
+    if (!kind || !canSave || gps.currentLat == null || gps.currentLng == null) {
       Alert.alert(
         'Incomplete form',
-        'GPS, scheme, plot, activity, and final remarks are required before saving.',
+        isDeseal
+          ? 'Location (≤50 m), at least one picture, and remarks are required.'
+          : 'Location (≤50 m), scheme, plot, activity, and remarks are required.',
       );
       return;
     }
+
+    const activityLabel =
+      kind === 'deseal'
+        ? 'De-sealing'
+        : selectedActivity?.label ||
+          SEAL_ACTIVITIES.find(a => a.value === (activityValue as PropertySealActivityValue))?.label ||
+          'Sealed / demolished';
+
     setSaving(true);
     try {
-      await addPropertySealVisit({
+      await addPendingPropertySealVisit({
         localId: `ps-${Date.now()}`,
-        kind: isDeseal ? 'deseal' : 'seal',
+        kind,
         officerId: user.id,
         officerName: user.name,
+        authToken: user.token,
         scheme: isDeseal ? '' : scheme.trim(),
         phase: isDeseal ? '' : phase.trim(),
         block: isDeseal ? '' : block.trim(),
         plot: isDeseal ? '' : plotLabel.trim(),
-        activityValue: isDeseal ? '5' : selectedActivity!.value,
-        activityLabel: isDeseal ? 'De-sealing' : selectedActivity!.label,
+        activityValue: isDeseal ? '5' : activityValue,
+        activityLabel,
         finalRemarks: finalRemarks.trim(),
         photoUris,
-        lat: isDeseal ? null : gps.currentLat,
-        lng: isDeseal ? null : gps.currentLng,
+        lat: gps.currentLat,
+        lng: gps.currentLng,
+        accuracyMeters: gps.currentAccuracy,
         savedAt: new Date().toISOString(),
       });
-      notifySuccess(
-        isDeseal ? 'Property Deseal saved on this device.' : 'Property Seal saved on this device.',
-      );
+
+      let uploaded = false;
+      try {
+        const syncResult = await syncPending({skipNotifications: true});
+        uploaded = syncResult.uploaded > 0;
+      } catch {
+        uploaded = false;
+      }
+
+      invalidateVisitCaches(queryClient, {serverPushSucceeded: uploaded});
+
+      if (uploaded) {
+        notifySuccess(
+          kind === 'deseal'
+            ? 'Property Deseal saved and sent to the server.'
+            : 'Property Seal saved and sent to the server.',
+        );
+      } else {
+        notifyWarning(
+          'Saved on this device. Open My Submissions to push when online (same as site visits).',
+        );
+      }
       onSaved();
     } catch {
       Alert.alert('Could not save', 'Try again.');
@@ -210,7 +270,7 @@ export default function PropertySealScreen({
 
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.header}>{isDeseal ? PROPERTY_DESEAL_TITLE : PROPERTY_SEAL_TITLE}</Text>
+      <Text style={styles.header}>{PROPERTY_SEAL_FLOW_TITLE}</Text>
       <View style={styles.officerContainer}>
         <Icon source="account-circle" size={24} color={colors.primary} />
         <Text style={styles.officerLabel}>
@@ -218,203 +278,264 @@ export default function PropertySealScreen({
         </Text>
       </View>
 
-      {!isDeseal ? (
-        <>
       <FormLabel
-        title="Scheme"
+        title="Seal or Deseal"
         required
         first
-        hint="Loaded from the housing portal plot bank. Pick a scheme first.">
-        <LookupSelect
-          title="Select scheme"
-          placeholder="Select scheme"
-          value={scheme}
-          options={schemesQuery.data ?? []}
-          loading={schemesQuery.isLoading}
-          error={schemesQuery.error ? (schemesQuery.error as Error).message : null}
-          onRetry={() => void schemesQuery.refetch()}
-          onSelect={option => {
-            setScheme(option.value);
-            setPhase('');
-            setBlock('');
-            setPlotId('');
-            setPlotLabel('');
-          }}
-          accessibilityLabel="Scheme"
-        />
-      </FormLabel>
-
-      <FormLabel title="Phase" hint="Fills after you pick a scheme.">
-        <LookupSelect
-          title="Select phase"
-          placeholder={scheme ? 'Select phase' : 'Select a scheme first'}
-          value={phase}
-          options={phasesQuery.data ?? []}
-          loading={phasesQuery.isFetching}
-          disabled={!scheme}
-          error={phasesQuery.error ? (phasesQuery.error as Error).message : null}
-          onRetry={() => void phasesQuery.refetch()}
-          onSelect={option => {
-            setPhase(option.value);
-            setBlock('');
-            setPlotId('');
-            setPlotLabel('');
-          }}
-          accessibilityLabel="Phase"
-        />
-      </FormLabel>
-
-      <FormLabel title="Block" hint="Fills after you pick a phase.">
-        <LookupSelect
-          title="Select block"
-          placeholder={phase ? 'Select block' : 'Select a phase first'}
-          value={block}
-          options={blocksQuery.data ?? []}
-          loading={blocksQuery.isFetching}
-          disabled={!phase}
-          error={blocksQuery.error ? (blocksQuery.error as Error).message : null}
-          onRetry={() => void blocksQuery.refetch()}
-          onSelect={option => {
-            setBlock(option.value);
-            setPlotId('');
-            setPlotLabel('');
-          }}
-          accessibilityLabel="Block"
-        />
-      </FormLabel>
-
-      <FormLabel title="Plot" required hint="Fills after you pick a block.">
-        <LookupSelect
-          title="Select plot"
-          placeholder={block ? 'Select plot' : 'Select a block first'}
-          value={plotId}
-          options={plotsQuery.data ?? []}
-          loading={plotsQuery.isFetching}
-          disabled={!block}
-          error={plotsQuery.error ? (plotsQuery.error as Error).message : null}
-          onRetry={() => void plotsQuery.refetch()}
-          onSelect={option => {
-            setPlotId(option.value);
-            setPlotLabel(option.label);
-          }}
-          accessibilityLabel="Plot"
-        />
-      </FormLabel>
-
-      <FormLabel title="Location" required hint="Same GPS capture as Completion Certificate site visit.">
-        <GpsLocationCard
-          gpsAllowed={gps.gpsAllowed}
-          gpsLoading={gps.gpsLoading}
-          gpsError={gps.gpsError}
-          gpsPermissionDenied={gps.gpsPermissionDenied}
-          currentLat={gps.currentLat}
-          currentLng={gps.currentLng}
-          needsPermissionPrompt={gps.needsPermissionPrompt}
-          onGetLocation={() => void gps.handleGetLocation()}
-          onRetryGps={() => gps.startLocationFlow(false)}
-          onOpenSettings={gps.handleOpenLocationSettings}
-        />
-      </FormLabel>
-        </>
-      ) : null}
-
-      <FormLabel
-        title={`Photos (${photoUris.length}/${PROPERTY_SEAL_MAX_PHOTOS})`}
-        required={isDeseal}
-        first={isDeseal}
-        hint={
-          isDeseal
-            ? 'Required. Add a picture field with +, then take or pick a photo for that row.'
-            : 'Optional. Add a picture field with +, then take or pick a photo for that row.'
-        }>
-        {photoSlots.map((slot, index) => (
-          <View key={slot.id} style={styles.photoRow}>
-            <View style={styles.photoRowHeader}>
-              <Text style={styles.photoRowTitle}>Picture {index + 1}</Text>
-              <TouchableOpacity
-                onPress={() => removePhotoSlot(slot.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`Remove picture ${index + 1}`}>
-                <Icon source="close-circle" size={22} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
-            {slot.uri ? (
-              <Image source={{uri: slot.uri}} style={styles.photoPreview} />
-            ) : (
-              <Text style={styles.helper}>No picture in this field yet.</Text>
-            )}
-            <PhotoPickerButtons
-              disabled={capturingPhoto}
-              onCamera={() => void pickPhotoForSlot(slot.id, true)}
-              onGallery={() => void pickPhotoForSlot(slot.id, false)}
-              cameraLabel="Take photo"
-              galleryLabel="From gallery"
-            />
-          </View>
-        ))}
-        <TouchableOpacity
-          style={[
-            styles.addPhotoButton,
-            photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto ? styles.addPhotoButtonDisabled : null,
-          ]}
-          onPress={addPhotoSlot}
-          disabled={photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto}
-          accessibilityRole="button"
-          accessibilityLabel="Add picture field">
-          <Icon source="plus" size={20} color="#ffffff" />
-          <Text style={styles.addPhotoButtonText}>Add picture</Text>
-        </TouchableOpacity>
-      </FormLabel>
-
-      {!isDeseal ? (
-      <FormLabel
-        title="Activity"
-        required
-        hint="Enforcement activity from the housing portal (FIR, demolition, sealing, stay orders, notices).">
+        hint="Choose the survey type first. The fields below come from the housing portal plot bank / activity list.">
         <View style={styles.activityWrap}>
-          {SEAL_ACTIVITIES.map(item => {
-            const selected = item.value === activityValue;
+          {PROPERTY_SEAL_KINDS.map(item => {
+            const selected = item.value === kind;
             return (
               <TouchableOpacity
                 key={item.value}
                 style={[styles.chip, selected ? styles.chipActive : styles.chipInactive]}
-                onPress={() => setActivityValue(item.value)}
+                onPress={() => selectKind(item.value)}
                 accessibilityRole="button"
-                accessibilityState={{selected}}>
-                <Text style={[styles.chipText, selected ? styles.chipTextActive : null]}>{item.label}</Text>
+                accessibilityState={{selected}}
+                accessibilityLabel={item.label}>
+                <Text style={[styles.chipText, selected ? styles.chipTextActive : null]}>
+                  {item.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </FormLabel>
-      ) : null}
 
-      <FormLabel title="Final remarks" required>
-        <TextInput
-          style={[styles.input, formStyles.notesInput, remarksFocused && styles.inputFocused]}
-          onFocus={() => setRemarksFocused(true)}
-          onBlur={() => setRemarksFocused(false)}
-          multiline
-          value={finalRemarks}
-          onChangeText={setFinalRemarks}
-          placeholder={isDeseal ? 'Summary of this Property Deseal' : 'Summary of this Property Seal'}
-          accessibilityLabel="Final remarks"
-        />
-      </FormLabel>
-
-      <TouchableOpacity
-        style={[styles.saveButton, canSave ? styles.saveButtonEnabled : styles.saveButtonDisabled]}
-        disabled={!canSave}
-        onPress={() => void handleSave()}
-        accessibilityState={{disabled: !canSave, busy: saving}}>
-        {saving ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text style={styles.saveButtonText}>
-            {isDeseal ? 'Save Property Deseal' : 'Save Property Seal'}
+      {kind ? (
+        <>
+          <Text style={styles.sectionTitle}>
+            {isDeseal ? PROPERTY_DESEAL_TITLE : PROPERTY_SEAL_TITLE} details
           </Text>
-        )}
-      </TouchableOpacity>
+
+          {isSeal ? (
+            <>
+              <FormLabel
+                title="Scheme"
+                required
+                hint="Loaded from the housing portal plot bank. Pick a scheme first.">
+                <LookupSelect
+                  title="Select scheme"
+                  placeholder="Select scheme"
+                  value={scheme}
+                  options={schemesQuery.data ?? []}
+                  loading={schemesQuery.isLoading}
+                  error={schemesQuery.error ? (schemesQuery.error as Error).message : null}
+                  onRetry={() => void schemesQuery.refetch()}
+                  onSelect={option => {
+                    setScheme(option.value);
+                    setPhase('');
+                    setBlock('');
+                    setPlotId('');
+                    setPlotLabel('');
+                  }}
+                  accessibilityLabel="Scheme"
+                />
+              </FormLabel>
+
+              <FormLabel title="Phase" hint="Fills after you pick a scheme.">
+                <LookupSelect
+                  title="Select phase"
+                  placeholder={scheme ? 'Select phase' : 'Select a scheme first'}
+                  value={phase}
+                  options={phasesQuery.data ?? []}
+                  loading={phasesQuery.isFetching}
+                  disabled={!scheme}
+                  error={phasesQuery.error ? (phasesQuery.error as Error).message : null}
+                  onRetry={() => void phasesQuery.refetch()}
+                  onSelect={option => {
+                    setPhase(option.value);
+                    setBlock('');
+                    setPlotId('');
+                    setPlotLabel('');
+                  }}
+                  accessibilityLabel="Phase"
+                />
+              </FormLabel>
+
+              <FormLabel title="Block" hint="Fills after you pick a phase.">
+                <LookupSelect
+                  title="Select block"
+                  placeholder={phase ? 'Select block' : 'Select a phase first'}
+                  value={block}
+                  options={blocksQuery.data ?? []}
+                  loading={blocksQuery.isFetching}
+                  disabled={!phase}
+                  error={blocksQuery.error ? (blocksQuery.error as Error).message : null}
+                  onRetry={() => void blocksQuery.refetch()}
+                  onSelect={option => {
+                    setBlock(option.value);
+                    setPlotId('');
+                    setPlotLabel('');
+                  }}
+                  accessibilityLabel="Block"
+                />
+              </FormLabel>
+
+              <FormLabel title="Plot" required hint="Fills after you pick a block.">
+                <LookupSelect
+                  title="Select plot"
+                  placeholder={block ? 'Select plot' : 'Select a block first'}
+                  value={plotId}
+                  options={plotsQuery.data ?? []}
+                  loading={plotsQuery.isFetching}
+                  disabled={!block}
+                  error={plotsQuery.error ? (plotsQuery.error as Error).message : null}
+                  onRetry={() => void plotsQuery.refetch()}
+                  onSelect={option => {
+                    gpsDebugLog('PropertySeal', 'plot selected', {
+                      plotId: option.value,
+                      plotLabel: option.label,
+                    });
+                    setPlotId(option.value);
+                    setPlotLabel(option.label);
+                  }}
+                  accessibilityLabel="Plot"
+                />
+              </FormLabel>
+
+              <FormLabel
+                title="Activity"
+                required
+                hint="Enforcement activity from the housing portal (FIR, demolition, sealing, stay orders, notices).">
+                <View style={styles.activityWrap}>
+                  {SEAL_ACTIVITIES.map(item => {
+                    const selected = item.value === activityValue;
+                    return (
+                      <TouchableOpacity
+                        key={item.value}
+                        style={[styles.chip, selected ? styles.chipActive : styles.chipInactive]}
+                        onPress={() => setActivityValue(item.value)}
+                        accessibilityRole="button"
+                        accessibilityState={{selected}}>
+                        <Text style={[styles.chipText, selected ? styles.chipTextActive : null]}>
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </FormLabel>
+            </>
+          ) : null}
+
+          {canShowLocation ? (
+            <FormLabel
+              title="Location"
+              required
+              hint={`After plot is selected, tap Get location. Accuracy must be ${PROPERTY_SEAL_MAX_GPS_ACCURACY_M} m or better to save.`}>
+              <GpsLocationCard
+                gpsAllowed={gps.gpsAllowed}
+                gpsLoading={gps.gpsLoading}
+                gpsError={gps.gpsError}
+                gpsPermissionDenied={gps.gpsPermissionDenied}
+                currentLat={gps.currentLat}
+                currentLng={gps.currentLng}
+                currentAccuracy={gps.currentAccuracy}
+                maxAccuracyMeters={PROPERTY_SEAL_MAX_GPS_ACCURACY_M}
+                needsPermissionPrompt={gps.needsPermissionPrompt}
+                allowOpenSettings={false}
+                onGetLocation={() => {
+                  gpsDebugLog('PropertySeal', 'Get location button pressed', {
+                    kind,
+                    scheme,
+                    plotLabel,
+                    canShowLocation,
+                  });
+                  void gps.handleGetLocation();
+                }}
+                onRetryGps={() => gps.startLocationFlow(false)}
+                onOpenSettings={gps.handleOpenLocationSettings}
+              />
+            </FormLabel>
+          ) : isSeal ? (
+            <Text style={styles.helper}>
+              Select scheme and plot first — then Get location will appear here.
+            </Text>
+          ) : null}
+
+          <FormLabel
+            title={`Photos (${photoUris.length}/${PROPERTY_SEAL_MAX_PHOTOS})`}
+            required={isDeseal}
+            hint={
+              isDeseal
+                ? 'Required. Add a picture field with +, then take or pick a photo for that row.'
+                : 'Optional. Add a picture field with +, then take or pick a photo for that row.'
+            }>
+            {photoSlots.map((slot, index) => (
+              <View key={slot.id} style={styles.photoRow}>
+                <View style={styles.photoRowHeader}>
+                  <Text style={styles.photoRowTitle}>Picture {index + 1}</Text>
+                  <TouchableOpacity
+                    onPress={() => removePhotoSlot(slot.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove picture ${index + 1}`}>
+                    <Icon source="close-circle" size={22} color={colors.danger} />
+                  </TouchableOpacity>
+                </View>
+                {slot.uri ? (
+                  <Image source={{uri: slot.uri}} style={styles.photoPreview} />
+                ) : (
+                  <Text style={styles.helper}>No picture in this field yet.</Text>
+                )}
+                <PhotoPickerButtons
+                  disabled={capturingPhoto}
+                  onCamera={() => void pickPhotoForSlot(slot.id, true)}
+                  onGallery={() => void pickPhotoForSlot(slot.id, false)}
+                  cameraLabel="Take photo"
+                  galleryLabel="From gallery"
+                />
+              </View>
+            ))}
+            <TouchableOpacity
+              style={[
+                styles.addPhotoButton,
+                photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto
+                  ? styles.addPhotoButtonDisabled
+                  : null,
+              ]}
+              onPress={addPhotoSlot}
+              disabled={photoSlots.length >= PROPERTY_SEAL_MAX_PHOTOS || capturingPhoto}
+              accessibilityRole="button"
+              accessibilityLabel="Add picture field">
+              <Icon source="plus" size={20} color="#ffffff" />
+              <Text style={styles.addPhotoButtonText}>Add picture</Text>
+            </TouchableOpacity>
+          </FormLabel>
+
+          <FormLabel title="Final remarks" required>
+            <TextInput
+              style={[styles.input, formStyles.notesInput, remarksFocused && styles.inputFocused]}
+              onFocus={() => setRemarksFocused(true)}
+              onBlur={() => setRemarksFocused(false)}
+              multiline
+              value={finalRemarks}
+              onChangeText={setFinalRemarks}
+              placeholder={
+                isDeseal ? 'Summary of this Property Deseal' : 'Summary of this Property Seal'
+              }
+              accessibilityLabel="Final remarks"
+            />
+          </FormLabel>
+
+          <TouchableOpacity
+            style={[styles.saveButton, canSave ? styles.saveButtonEnabled : styles.saveButtonDisabled]}
+            disabled={!canSave}
+            onPress={() => void handleSave()}
+            accessibilityState={{disabled: !canSave, busy: saving}}>
+            {saving ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.saveButtonText}>
+                {isDeseal ? 'Save Property Deseal' : 'Save Property Seal'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <GpsDebugPanel title="Property Seal GPS debug (dev)" />
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -427,6 +548,13 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   header: {fontSize: 20, fontWeight: '700', color: colors.primary},
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 12,
+    marginBottom: 4,
+  },
   officerContainer: {
     flexDirection: 'row',
     alignItems: 'center',

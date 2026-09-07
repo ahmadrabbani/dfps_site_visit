@@ -11,7 +11,11 @@ interface GpsLocationCardProps {
   gpsPermissionDenied: boolean;
   currentLat: number | null;
   currentLng: number | null;
+  currentAccuracy?: number | null;
+  maxAccuracyMeters?: number;
   needsPermissionPrompt: boolean;
+  /** When false, never open system Settings (keeps the app in foreground). Default true. */
+  allowOpenSettings?: boolean;
   onGetLocation: () => void;
   onRetryGps: () => void;
   onOpenSettings: () => void;
@@ -24,28 +28,44 @@ export default function GpsLocationCard({
   gpsPermissionDenied,
   currentLat,
   currentLng,
+  currentAccuracy = null,
+  maxAccuracyMeters,
   needsPermissionPrompt,
+  allowOpenSettings = true,
   onGetLocation,
   onRetryGps,
   onOpenSettings,
 }: GpsLocationCardProps) {
+  const accuracyTooWeak =
+    maxAccuracyMeters != null &&
+    currentAccuracy != null &&
+    currentAccuracy > maxAccuracyMeters;
+
   return (
     <View style={styles.locationSection}>
       <View style={styles.locationCard}>
         <View style={styles.locationCardHeader}>
           <Icon
-            source={gpsAllowed ? 'map-marker' : 'map-marker-off'}
+            source={gpsAllowed && !accuracyTooWeak ? 'map-marker' : 'map-marker-off'}
             size={22}
-            color={gpsLoading ? colors.mutedText : gpsAllowed ? colors.success : colors.danger}
+            color={
+              gpsLoading
+                ? colors.mutedText
+                : gpsAllowed && !accuracyTooWeak
+                  ? colors.success
+                  : colors.danger
+            }
           />
           <Text style={styles.locationTitle}>
             {gpsLoading
               ? 'Acquiring GPS location...'
-              : gpsAllowed
+              : gpsAllowed && !accuracyTooWeak
                 ? 'GPS Location Ready'
-                : needsPermissionPrompt
-                  ? 'Location required'
-                  : 'GPS Signal Offline'}
+                : accuracyTooWeak
+                  ? 'GPS accuracy too weak'
+                  : needsPermissionPrompt
+                    ? 'Location required'
+                    : 'GPS Signal Offline'}
           </Text>
         </View>
 
@@ -60,6 +80,21 @@ export default function GpsLocationCard({
               <Text style={styles.coordinateLabel}>LONGITUDE</Text>
               <Text style={styles.coordinateValue}>{formatCoord(currentLng)}</Text>
             </View>
+            {currentAccuracy != null ? (
+              <>
+                <View style={styles.coordinateDivider} />
+                <View style={styles.coordinateBlock}>
+                  <Text style={styles.coordinateLabel}>ACCURACY</Text>
+                  <Text
+                    style={[
+                      styles.coordinateValue,
+                      accuracyTooWeak ? styles.coordinateValueWarn : null,
+                    ]}>
+                    {Math.round(currentAccuracy)} m
+                  </Text>
+                </View>
+              </>
+            ) : null}
           </View>
         ) : (
           <Text style={styles.locationError}>
@@ -67,7 +102,14 @@ export default function GpsLocationCard({
           </Text>
         )}
 
-        {!gpsLoading && !gpsAllowed ? (
+        {accuracyTooWeak ? (
+          <Text style={styles.accuracyHint}>
+            Accuracy is {Math.round(currentAccuracy!)} m. Move outdoors until it is{' '}
+            {maxAccuracyMeters} m or better, then tap Retry GPS.
+          </Text>
+        ) : null}
+
+        {!gpsLoading && (!gpsAllowed || accuracyTooWeak) ? (
           <View style={styles.locationActionRow}>
             <TouchableOpacity style={styles.locationRetryBtn} onPress={onGetLocation}>
               <Icon source="map-marker-radius" size={16} color="#ffffff" />
@@ -81,7 +123,7 @@ export default function GpsLocationCard({
                 Retry GPS
               </Text>
             </TouchableOpacity>
-            {gpsPermissionDenied ? (
+            {gpsPermissionDenied && allowOpenSettings ? (
               <TouchableOpacity style={styles.locationSettingsBtn} onPress={onOpenSettings}>
                 <Text style={styles.locationSettingsBtnText}>Open Settings</Text>
               </TouchableOpacity>
@@ -148,6 +190,9 @@ const styles = StyleSheet.create({
     color: colors.success,
     marginTop: 4,
   },
+  coordinateValueWarn: {
+    color: colors.danger,
+  },
   coordinateDivider: {
     width: 1,
     height: 32,
@@ -157,6 +202,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.mutedText,
     lineHeight: 18,
+  },
+  accuracyHint: {
+    marginTop: 10,
+    fontSize: 12,
+    color: colors.danger,
+    lineHeight: 17,
   },
   locationActionRow: {
     flexDirection: 'row',
