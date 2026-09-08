@@ -16,6 +16,7 @@ import {launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import {FormLabel} from '../components/FormLabel';
 import GpsLocationCard from '../components/GpsLocationCard';
 import GpsDebugPanel from '../components/GpsDebugPanel';
+import OfficerLocationMap from '../components/OfficerLocationMap';
 import LookupSelect from '../components/LookupSelect';
 import PhotoPickerButtons from '../components/PhotoPickerButtons';
 import {
@@ -40,6 +41,7 @@ import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
 import {notifySuccess, notifyWarning} from '../utils/notify';
 import {gpsDebugLog} from '../utils/gpsDebugLog';
+import {hapticMedium, hapticSelection} from '../utils/haptics';
 
 interface PropertySealScreenProps {
   user: SessionUser;
@@ -75,11 +77,13 @@ export default function PropertySealScreen({
   const [saving, setSaving] = useState(false);
   const [remarksFocused, setRemarksFocused] = useState(false);
 
-  const canShowLocation = isDeseal || (isSeal && plotLabel.trim().length > 0);
+  // Location appears as soon as Seal / Deseal is chosen (kind defaults to seal).
+  const canShowLocation = Boolean(kind);
 
   const gps = useSiteVisitGps(false, {
     stayInApp: true,
     enabled: canShowLocation,
+    maxAccuracyMeters: PROPERTY_SEAL_MAX_GPS_ACCURACY_M,
     debugTag: 'PropertySeal',
   });
 
@@ -133,6 +137,7 @@ export default function PropertySealScreen({
       : scheme.trim().length > 0 && plotLabel.trim().length > 0 && Boolean(activityValue));
 
   const selectKind = (next: PropertySealVisitKind) => {
+    hapticSelection();
     gpsDebugLog('PropertySeal', 'selectKind', {next, previous: kind});
     setKind(next);
     setScheme('');
@@ -278,11 +283,7 @@ export default function PropertySealScreen({
         </Text>
       </View>
 
-      <FormLabel
-        title="Seal or Deseal"
-        required
-        first
-        hint="Choose the survey type first. The fields below come from the housing portal plot bank / activity list.">
+      <FormLabel title="Seal or Deseal" required first compact>
         <View style={styles.activityWrap}>
           {PROPERTY_SEAL_KINDS.map(item => {
             const selected = item.value === kind;
@@ -305,16 +306,50 @@ export default function PropertySealScreen({
 
       {kind ? (
         <>
+          <FormLabel title="Location" required compact>
+            <GpsLocationCard
+              gpsAllowed={gps.gpsAllowed}
+              gpsLoading={gps.gpsLoading}
+              gpsError={gps.gpsError}
+              gpsPermissionDenied={gps.gpsPermissionDenied}
+              currentLat={gps.currentLat}
+              currentLng={gps.currentLng}
+              currentAccuracy={gps.currentAccuracy}
+              maxAccuracyMeters={PROPERTY_SEAL_MAX_GPS_ACCURACY_M}
+              needsPermissionPrompt={gps.needsPermissionPrompt}
+              allowOpenSettings={false}
+              onGetLocation={() => {
+                hapticMedium();
+                gpsDebugLog('PropertySeal', 'Get location button pressed', {
+                  kind,
+                  scheme,
+                  plotLabel,
+                  canShowLocation,
+                });
+                void gps.handleGetLocation();
+              }}
+              onRetryGps={() => {
+                hapticMedium();
+                gps.startLocationFlow(false);
+              }}
+              onOpenSettings={gps.handleOpenLocationSettings}
+            />
+            {gps.currentLat != null && gps.currentLng != null ? (
+              <OfficerLocationMap
+                lat={gps.currentLat}
+                lng={gps.currentLng}
+                accuracyMeters={gps.currentAccuracy}
+              />
+            ) : null}
+          </FormLabel>
+
           <Text style={styles.sectionTitle}>
             {isDeseal ? PROPERTY_DESEAL_TITLE : PROPERTY_SEAL_TITLE} details
           </Text>
 
           {isSeal ? (
             <>
-              <FormLabel
-                title="Scheme"
-                required
-                hint="Loaded from the housing portal plot bank. Pick a scheme first.">
+              <FormLabel title="Scheme" required compact>
                 <LookupSelect
                   title="Select scheme"
                   placeholder="Select scheme"
@@ -334,10 +369,10 @@ export default function PropertySealScreen({
                 />
               </FormLabel>
 
-              <FormLabel title="Phase" hint="Fills after you pick a scheme.">
+              <FormLabel title="Phase" compact>
                 <LookupSelect
                   title="Select phase"
-                  placeholder={scheme ? 'Select phase' : 'Select a scheme first'}
+                  placeholder="Select phase"
                   value={phase}
                   options={phasesQuery.data ?? []}
                   loading={phasesQuery.isFetching}
@@ -354,10 +389,10 @@ export default function PropertySealScreen({
                 />
               </FormLabel>
 
-              <FormLabel title="Block" hint="Fills after you pick a phase.">
+              <FormLabel title="Block" compact>
                 <LookupSelect
                   title="Select block"
-                  placeholder={phase ? 'Select block' : 'Select a phase first'}
+                  placeholder="Select block"
                   value={block}
                   options={blocksQuery.data ?? []}
                   loading={blocksQuery.isFetching}
@@ -373,10 +408,10 @@ export default function PropertySealScreen({
                 />
               </FormLabel>
 
-              <FormLabel title="Plot" required hint="Fills after you pick a block.">
+              <FormLabel title="Plot" required compact>
                 <LookupSelect
                   title="Select plot"
-                  placeholder={block ? 'Select plot' : 'Select a block first'}
+                  placeholder="Select plot"
                   value={plotId}
                   options={plotsQuery.data ?? []}
                   loading={plotsQuery.isFetching}
@@ -395,10 +430,7 @@ export default function PropertySealScreen({
                 />
               </FormLabel>
 
-              <FormLabel
-                title="Activity"
-                required
-                hint="Enforcement activity from the housing portal (FIR, demolition, sealing, stay orders, notices).">
+              <FormLabel title="Activity" required compact>
                 <View style={styles.activityWrap}>
                   {SEAL_ACTIVITIES.map(item => {
                     const selected = item.value === activityValue;
@@ -406,7 +438,10 @@ export default function PropertySealScreen({
                       <TouchableOpacity
                         key={item.value}
                         style={[styles.chip, selected ? styles.chipActive : styles.chipInactive]}
-                        onPress={() => setActivityValue(item.value)}
+                        onPress={() => {
+                          hapticSelection();
+                          setActivityValue(item.value);
+                        }}
                         accessibilityRole="button"
                         accessibilityState={{selected}}>
                         <Text style={[styles.chipText, selected ? styles.chipTextActive : null]}>
@@ -418,41 +453,6 @@ export default function PropertySealScreen({
                 </View>
               </FormLabel>
             </>
-          ) : null}
-
-          {canShowLocation ? (
-            <FormLabel
-              title="Location"
-              required
-              hint={`After plot is selected, tap Get location. Accuracy must be ${PROPERTY_SEAL_MAX_GPS_ACCURACY_M} m or better to save.`}>
-              <GpsLocationCard
-                gpsAllowed={gps.gpsAllowed}
-                gpsLoading={gps.gpsLoading}
-                gpsError={gps.gpsError}
-                gpsPermissionDenied={gps.gpsPermissionDenied}
-                currentLat={gps.currentLat}
-                currentLng={gps.currentLng}
-                currentAccuracy={gps.currentAccuracy}
-                maxAccuracyMeters={PROPERTY_SEAL_MAX_GPS_ACCURACY_M}
-                needsPermissionPrompt={gps.needsPermissionPrompt}
-                allowOpenSettings={false}
-                onGetLocation={() => {
-                  gpsDebugLog('PropertySeal', 'Get location button pressed', {
-                    kind,
-                    scheme,
-                    plotLabel,
-                    canShowLocation,
-                  });
-                  void gps.handleGetLocation();
-                }}
-                onRetryGps={() => gps.startLocationFlow(false)}
-                onOpenSettings={gps.handleOpenLocationSettings}
-              />
-            </FormLabel>
-          ) : isSeal ? (
-            <Text style={styles.helper}>
-              Select scheme and plot first — then Get location will appear here.
-            </Text>
           ) : null}
 
           <FormLabel
@@ -522,7 +522,10 @@ export default function PropertySealScreen({
           <TouchableOpacity
             style={[styles.saveButton, canSave ? styles.saveButtonEnabled : styles.saveButtonDisabled]}
             disabled={!canSave}
-            onPress={() => void handleSave()}
+            onPress={() => {
+              hapticMedium();
+              void handleSave();
+            }}
             accessibilityState={{disabled: !canSave, busy: saving}}>
             {saving ? (
               <ActivityIndicator color="#ffffff" />
@@ -552,8 +555,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: colors.text,
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: 8,
+    marginBottom: 0,
   },
   officerContainer: {
     flexDirection: 'row',

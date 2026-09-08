@@ -90,12 +90,15 @@ describe('PropertySealScreen', () => {
     mockPlots.mockResolvedValue([{value: '101', label: '12'}]);
   });
 
-  test('defaults to Property Seal and hides location until plot is selected', async () => {
+  test('defaults to Property Seal and shows location right after Seal or Deseal', async () => {
     renderScreen();
     expect(screen.getByText('Property Seal & Deseal')).toBeTruthy();
     expect(screen.getByLabelText('Property Seal')).toBeTruthy();
-    expect(screen.queryByText(/GPS accuracy must be 50 m/)).toBeNull();
-    expect(screen.getByText(/Select scheme and plot first/)).toBeTruthy();
+    expect(screen.getByText('GPS Location Ready')).toBeTruthy();
+    expect(screen.queryByText(/Choose the survey type first/)).toBeNull();
+    expect(screen.queryByText(/Fills after you pick/)).toBeNull();
+    expect(screen.getByText('MapLibre preview')).toBeTruthy();
+    expect(screen.getByText('Open in Google Maps')).toBeTruthy();
     await waitFor(() => {
       expect(screen.getByLabelText('Scheme')).toBeTruthy();
     });
@@ -118,7 +121,7 @@ describe('PropertySealScreen', () => {
       expect(mockSchemes).toHaveBeenCalled();
       expect(screen.getByText('Select scheme')).toBeTruthy();
     });
-    expect(screen.getByText('Select a scheme first')).toBeTruthy();
+    expect(screen.getByText('Select phase')).toBeTruthy();
     expect(mockPhases).not.toHaveBeenCalled();
     expect(mockBlocks).not.toHaveBeenCalled();
     expect(mockPlots).not.toHaveBeenCalled();
@@ -133,6 +136,6 @@ describe('PropertySealScreen', () => {
     expect(screen.getByLabelText('Final remarks')).toBeTruthy();
     expect(screen.getByLabelText('Add picture field')).toBeTruthy();
     expect(screen.getByText('Save Property Deseal')).toBeDisabled();
-    expect(screen.getByText(/After plot is selected, tap Get location/)).toBeTruthy();
+    expect(screen.getByText('GPS Location Ready')).toBeTruthy();
   });
 });

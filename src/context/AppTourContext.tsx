@@ -2,15 +2,12 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
-import {InteractionManager} from 'react-native';
 import {APP_TOUR_STEP_COUNT} from '../constants/appTourSteps';
-import {hasCompletedAppTour, setAppTourCompleted} from '../services/appTourStorage';
+import {setAppTourCompleted} from '../services/appTourStorage';
 
 interface AppTourContextValue {
   visible: boolean;
@@ -31,10 +28,10 @@ interface AppTourProviderProps extends PropsWithChildren {
   username: string;
 }
 
+/** Tour opens only when the officer taps App tour in the main drawer — never auto. */
 export function AppTourProvider({username, children}: AppTourProviderProps) {
   const [visible, setVisible] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
-  const autoShownRef = useRef(false);
 
   const finishTour = useCallback(async () => {
     await setAppTourCompleted(username);
@@ -58,35 +55,6 @@ export function AppTourProvider({username, children}: AppTourProviderProps) {
   const prevStep = useCallback(() => {
     setStepIndex(prev => Math.max(0, prev - 1));
   }, []);
-
-  useEffect(() => {
-    autoShownRef.current = false;
-  }, [username]);
-
-  useEffect(() => {
-    if (!username.trim() || autoShownRef.current) {
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const completed = await hasCompletedAppTour(username);
-      if (cancelled || completed) {
-        return;
-      }
-      autoShownRef.current = true;
-      InteractionManager.runAfterInteractions(() => {
-        if (!cancelled) {
-          setTimeout(() => {
-            setStepIndex(0);
-            setVisible(true);
-          }, 500);
-        }
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [username]);
 
   const value = useMemo<AppTourContextValue>(
     () => ({

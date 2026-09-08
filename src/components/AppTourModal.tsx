@@ -8,6 +8,7 @@ import {useAppTour} from '../context/AppTourContext';
 import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import {colors} from '../theme/colors';
 import {glassStyles} from '../theme/glassStyles';
+import {hapticLight, hapticSelection, hapticSuccess} from '../utils/haptics';
 
 export default function AppTourModal() {
   const navigation = useNavigation<any>();
@@ -27,16 +28,19 @@ export default function AppTourModal() {
   };
 
   const handleSkip = () => {
+    hapticLight();
     skipTour();
     openDashboard();
   };
 
   const handlePrimary = () => {
     if (isLastStep) {
+      hapticSuccess();
       finishTour();
       openDashboard();
       return;
     }
+    hapticSelection();
     nextStep();
   };
 
@@ -105,7 +109,10 @@ export default function AppTourModal() {
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Previous tour step"
-                  onPress={prevStep}
+                  onPress={() => {
+                    hapticLight();
+                    prevStep();
+                  }}
                   style={({pressed}) => [styles.backBtn, pressed ? styles.btnPressed : null]}>
                   <Text style={styles.backBtnText}>Back</Text>
                 </Pressable>

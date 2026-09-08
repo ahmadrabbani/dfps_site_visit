@@ -18,6 +18,7 @@ import {usePendingVisitCount, usePendingVisitsQuery} from '../hooks/usePendingVi
 import {useSyncPendingMutation} from '../hooks/useSyncPendingMutation';
 import {prepareSiteVisitLocation} from '../utils/prepareSiteVisitLocation';
 import {useAppTour} from '../context/AppTourContext';
+import {hapticLight, hapticSelection} from '../utils/haptics';
 import ConnectionStatusDot from './ConnectionStatusDot';
 
 const ldaLogo = require('../../LDA-logo.png');
@@ -132,6 +133,7 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
   }, [navigation, onSignOut]);
 
   const handleAppTour = useCallback(() => {
+    hapticSelection();
     navigation.closeDrawer();
     startTour();
   }, [navigation, startTour]);
@@ -196,7 +198,10 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
                 disabled={menuNavigating || syncMutation.isPending}
                 accessibilityRole="button"
                 accessibilityState={{selected: active, disabled: menuNavigating || syncMutation.isPending}}
-                onPress={() => void navigateTo(item.route)}
+                onPress={() => {
+                  hapticLight();
+                  void navigateTo(item.route);
+                }}
                 style={({pressed}) => [
                   styles.menuItem,
                   active ? styles.menuItemActive : null,

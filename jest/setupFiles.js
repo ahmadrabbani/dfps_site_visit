@@ -80,6 +80,25 @@ jest.mock('@sentry/react-native', () => ({
   }),
 }));
 
+jest.mock('react-native-haptic-feedback', () => ({
+  __esModule: true,
+  default: {
+    trigger: jest.fn(),
+  },
+  HapticFeedbackTypes: {
+    selection: 'selection',
+    impactLight: 'impactLight',
+    impactMedium: 'impactMedium',
+    notificationSuccess: 'notificationSuccess',
+    notificationWarning: 'notificationWarning',
+    notificationError: 'notificationError',
+    effectClick: 'effectClick',
+    effectDoubleClick: 'effectDoubleClick',
+    effectHeavyClick: 'effectHeavyClick',
+    effectTick: 'effectTick',
+  },
+}));
+
 jest.mock('react-native-maps', () => {
   const RN = require('react-native');
   return {
@@ -87,6 +106,32 @@ jest.mock('react-native-maps', () => {
     default: RN.View,
     Marker: RN.View,
     PROVIDER_GOOGLE: 'google',
+  };
+});
+
+jest.mock('@maplibre/maplibre-react-native', () => {
+  const React = require('react');
+  const {View} = require('react-native');
+  const Stub = ({children, ...rest}) => <View {...rest}>{children}</View>;
+  return {
+    Map: Stub,
+    Camera: React.forwardRef((props, _ref) => <Stub {...props} />),
+    Marker: Stub,
+    ViewAnnotation: Stub,
+  };
+});
+
+jest.mock('../src/components/OfficerLocationMap', () => {
+  const {View, Text} = require('react-native');
+  return {
+    __esModule: true,
+    default: () => (
+      <View>
+        <Text>MapLibre preview</Text>
+        <Text>Open in Google Maps</Text>
+      </View>
+    ),
+    FREE_MAP_STYLE_URL: 'https://tiles.openfreemap.org/styles/liberty',
   };
 });
 

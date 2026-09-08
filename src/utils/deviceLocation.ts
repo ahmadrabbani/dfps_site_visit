@@ -82,6 +82,24 @@ function getCurrentPositionOnce(options: PositionOptions): Promise<DeviceCoords>
   });
 }
 
+export class GpsAccuracyError extends Error {
+  accuracy: number;
+  maxAccuracyMeters: number;
+  lat: number;
+  lng: number;
+
+  constructor(accuracy: number, maxAccuracyMeters: number, lat: number, lng: number) {
+    super(
+      `GPS accuracy is ${Math.round(accuracy)} m. Move outdoors until accuracy is ${maxAccuracyMeters} m or better.`,
+    );
+    this.name = 'GpsAccuracyError';
+    this.accuracy = accuracy;
+    this.maxAccuracyMeters = maxAccuracyMeters;
+    this.lat = lat;
+    this.lng = lng;
+  }
+}
+
 /**
  * Fetches GPS after permission is already granted. Does not request permission.
  */
@@ -112,28 +130,55 @@ export async function acquireDeviceCoords(
   const attempts: PositionOptions[] =
     Platform.OS === 'android'
       ? options.stayInApp
-        ? [
-            {
-              enableHighAccuracy: true,
-              timeout: 45000,
-              maximumAge: 5000,
-              showLocationDialog: false,
-              // forceRequestLocation bypasses the "settings not satisfied" check result
-              // (no system dialog is shown) and requests location directly while the
-              // app stays in the foreground. Required when showLocationDialog is false,
-              // otherwise the fused provider fails fast with SETTINGS_NOT_SATISFIED.
-              forceRequestLocation: true,
-              forceLocationManager: false,
-            },
-            {
-              enableHighAccuracy: false,
-              timeout: 30000,
-              maximumAge: 10000,
-              showLocationDialog: false,
-              forceRequestLocation: true,
-              forceLocationManager: false,
-            },
-          ]
+        ? options.maxAccuracyMeters != null
+          ? [
+              {
+                enableHighAccuracy: true,
+                timeout: 25000,
+                maximumAge: 5000,
+                showLocationDialog: false,
+                forceRequestLocation: true,
+                forceLocationManager: false,
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 25000,
+                maximumAge: 0,
+                showLocationDialog: false,
+                forceRequestLocation: true,
+                forceLocationManager: false,
+              },
+              {
+                enableHighAccuracy: true,
+                timeout: 25000,
+                maximumAge: 0,
+                showLocationDialog: false,
+                forceRequestLocation: true,
+                forceLocationManager: false,
+              },
+            ]
+          : [
+              {
+                enableHighAccuracy: true,
+                timeout: 45000,
+                maximumAge: 5000,
+                showLocationDialog: false,
+                // forceRequestLocation bypasses the "settings not satisfied" check result
+                // (no system dialog is shown) and requests location directly while the
+                // app stays in the foreground. Required when showLocationDialog is false,
+                // otherwise the fused provider fails fast with SETTINGS_NOT_SATISFIED.
+                forceRequestLocation: true,
+                forceLocationManager: false,
+              },
+              {
+                enableHighAccuracy: false,
+                timeout: 30000,
+                maximumAge: 10000,
+                showLocationDialog: false,
+                forceRequestLocation: true,
+                forceLocationManager: false,
+              },
+            ]
         : [
             {
               enableHighAccuracy: true,
@@ -163,6 +208,8 @@ export async function acquireDeviceCoords(
         ];
 
   let lastError: GeolocationError | Error | null = null;
+  let bestCoords: DeviceCoords | null = null;
+
   for (let i = 0; i < attempts.length; i += 1) {
     const attempt = attempts[i];
     try {
@@ -182,24 +229,54 @@ export async function acquireDeviceCoords(
         coords.accuracy != null &&
         coords.accuracy > options.maxAccuracyMeters
       ) {
-        gpsDebugLog(tag, 'accuracy rejected', {
+        if (!bestCoords || (coords.accuracy < (bestCoords.accuracy ?? Infinity))) {
+          bestCoords = coords;
+        }
+        gpsDebugLog(tag, 'accuracy rejected on attempt', {
           accuracy: coords.accuracy,
           max: options.maxAccuracyMeters,
+          attempt: i + 1,
+          total: attempts.length,
         });
-        throw new Error(
-          `GPS accuracy is ${Math.round(coords.accuracy)} m. Move outdoors until accuracy is ${options.maxAccuracyMeters} m or better.`,
+        if (i < attempts.length - 1) {
+          // Delay to give the GPS hardware / satellite lock time to refine accuracy <= 50m
+          await delay(1500);
+          continue;
+        }
+        throw new GpsAccuracyError(
+          bestCoords.accuracy ?? coords.accuracy,
+          options.maxAccuracyMeters,
+          bestCoords.lat,
+          bestCoords.lng,
         );
       }
       gpsDebugLog(tag, 'acquireDeviceCoords success');
       return coords;
     } catch (error) {
       lastError = error as GeolocationError | Error;
+      if (error instanceof GpsAccuracyError) {
+        throw error;
+      }
       gpsDebugLog(tag, `attempt ${i + 1} failed`, {
         message: (error as Error)?.message,
         code: (error as GeolocationError)?.code,
       });
       await delay(300);
     }
+  }
+
+  if (
+    bestCoords &&
+    options.maxAccuracyMeters != null &&
+    bestCoords.accuracy != null &&
+    bestCoords.accuracy > options.maxAccuracyMeters
+  ) {
+    throw new GpsAccuracyError(
+      bestCoords.accuracy,
+      options.maxAccuracyMeters,
+      bestCoords.lat,
+      bestCoords.lng,
+    );
   }
 
   gpsDebugLog(tag, 'acquireDeviceCoords failed all attempts');

@@ -1,6 +1,11 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {AppState, InteractionManager, Platform, type AppStateStatus} from 'react-native';
-import {acquireDeviceCoords, isGpsPermissionError, isGpsSettingsError} from '../utils/deviceLocation';
+import {
+  acquireDeviceCoords,
+  isGpsPermissionError,
+  isGpsSettingsError,
+  GpsAccuracyError,
+} from '../utils/deviceLocation';
 import {
   hasLocationPermission,
   openAppSettings,
@@ -48,6 +53,12 @@ export function useSiteVisitGps(
   const enabledRef = useRef(options?.enabled !== false);
   const debugTagRef = useRef(options?.debugTag || DEFAULT_DEBUG_TAG);
 
+  maxAccuracyRef.current = options?.maxAccuracyMeters;
+  stayInAppRef.current = options?.stayInApp === true;
+  enabledRef.current = options?.enabled !== false;
+  skipPermissionRequestRef.current = options?.skipPermissionRequest === true;
+  debugTagRef.current = options?.debugTag || DEFAULT_DEBUG_TAG;
+
   const log = useCallback(
     (message: string, data?: Record<string, unknown>) => {
       gpsDebugLog(debugTagRef.current, message, data);
@@ -77,6 +88,15 @@ export function useSiteVisitGps(
     });
     setGpsAllowed(false);
     setGpsLoading(false);
+    if (error instanceof GpsAccuracyError) {
+      setCurrentLat(error.lat);
+      setCurrentLng(error.lng);
+      setCurrentAccuracy(error.accuracy);
+      setGpsPermissionDenied(false);
+      setNeedsPermissionPrompt(false);
+      setGpsError(error.message);
+      return;
+    }
     setCurrentLat(null);
     setCurrentLng(null);
     setCurrentAccuracy(null);

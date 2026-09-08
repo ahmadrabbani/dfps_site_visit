@@ -20,6 +20,13 @@ export type AppTourStep =
       actions: AppTourActionCard[];
     }
   | {
+      id: 'propertySeal';
+      kind: 'standard';
+      title: string;
+      body: string;
+      icon: string;
+    }
+  | {
       id: 'menu';
       kind: 'standard';
       title: string;
@@ -40,26 +47,26 @@ export const APP_TOUR_STEPS: AppTourStep[] = [
     kind: 'welcome',
     title: 'Welcome to DFPS Site Visit',
     body:
-      'This short tour shows the main things you will do in the app: record a completion certificate visit or Property Seal / Deseal on-site, and send saved CC surveys to the server.',
+      'This tour covers Completion Certificate site visits, Property Seal & Deseal, and how to upload saved work from the menu.',
     icon: 'map-marker-check-outline',
   },
   {
     id: 'actions',
     kind: 'actions',
     title: 'Your main actions',
-    body: 'Use these from the Dashboard or open the menu (☰) at any time:',
+    body: 'Open these from the Dashboard or the menu (☰):',
     actions: [
       {
         title: 'DFPS Site Visit',
         description:
-          'Start a completion certificate survey. Allow GPS, pick the case, record violations or a clear visit, then save.',
+          'Completion certificate survey: allow GPS, pick the case, record violations or a clear visit, then save.',
         icon: 'map-marker-check-outline',
       },
       {
         title: 'Property Seal & Deseal',
         description:
-          'Choose Property Seal (scheme, plot, GPS, activity) or Property Deseal (pictures and remarks only).',
-        icon: 'home-search-outline',
+          'Enforcement form: get GPS (≤50 m), fill scheme/plot/activity for Seal, or photos and remarks for Deseal.',
+        icon: 'home-lock',
       },
       {
         title: 'My Site Visits & Submissions',
@@ -70,18 +77,27 @@ export const APP_TOUR_STEPS: AppTourStep[] = [
     ],
   },
   {
+    id: 'propertySeal',
+    kind: 'standard',
+    title: 'Property Seal & Deseal',
+    body:
+      'From the menu, open Property Seal & Deseal. Choose Seal or Deseal first, then Get location (accuracy must be 50 m or better). For Seal, pick scheme, plot, and activity. For Deseal, add photos and remarks. Save when ready — work uploads when online.',
+    icon: 'home-lock',
+  },
+  {
     id: 'menu',
     kind: 'standard',
     title: 'Navigation menu',
     body:
-      'Swipe from the left edge of the screen or tap the menu icon (☰) in the top bar to open the drawer. You can switch screens, sync pending visits, sign out, or open this tour again.',
+      'Swipe from the left edge or tap ☰ to open the drawer. Switch screens, sync pending visits, sign out, or start this tour again anytime.',
     icon: 'menu',
   },
   {
     id: 'done',
     kind: 'done',
     title: "You're ready",
-    body: 'Start a site visit from the Dashboard when you arrive on site. Check My Submissions to upload saved visits.',
+    body:
+      'Use DFPS Site Visit for completion certificates, or Property Seal & Deseal for sealing work. Check My Submissions to upload anything still on the device.',
     icon: 'check-circle-outline',
   },
 ];
