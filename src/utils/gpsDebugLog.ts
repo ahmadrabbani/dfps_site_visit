@@ -15,19 +15,26 @@ function formatData(data?: Record<string, unknown>): string {
   }
 }
 
-/** Log GPS steps to Metro/logcat and optional on-screen debug panel. */
+/** Log GPS steps to Metro/logcat (dev only) and optional on-screen debug panel. */
 export function gpsDebugLog(tag: string, message: string, data?: Record<string, unknown>): void {
   const ts = new Date().toISOString().slice(11, 23);
   const line = `${ts} [${tag}] ${message}${formatData(data)}`;
-  console.log(`[PropertySealGPS] ${line}`);
+  if (__DEV__) {
+    console.log(`[PropertySealGPS] ${line}`);
+  }
   lines.unshift(line);
   if (lines.length > MAX_LINES) {
     lines.pop();
   }
-  listeners.forEach(listener => listener(line));
+  if (__DEV__) {
+    listeners.forEach(listener => listener(line));
+  }
 }
 
 export function subscribeGpsDebug(listener: GpsDebugListener): () => void {
+  if (!__DEV__) {
+    return () => undefined;
+  }
   listeners.add(listener);
   lines.forEach(line => listener(line));
   return () => listeners.delete(listener);

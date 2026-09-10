@@ -122,7 +122,10 @@ export default function LookupSelect({
                   onPress={() => {
                     onSelect(item);
                     setOpen(false);
-                  }}>
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{selected: active}}>
                   <Text style={[styles.modalRowText, active ? styles.modalRowTextActive : null]}>
                     {item.label}
                   </Text>
@@ -132,7 +135,9 @@ export default function LookupSelect({
           />
           <TouchableOpacity
             style={[styles.modalClose, {marginBottom: Math.max(insets.bottom, 16) + 8}]}
-            onPress={() => setOpen(false)}>
+            onPress={() => setOpen(false)}
+            accessibilityRole="button"
+            accessibilityLabel={`Close ${title}`}>
             <Text style={styles.modalCloseText}>Close</Text>
           </TouchableOpacity>
         </View>

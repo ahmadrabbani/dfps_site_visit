@@ -39,9 +39,10 @@ import {syncPending} from '../services/syncService';
 import {colors} from '../theme/colors';
 import {formStyles} from '../theme/formStyles';
 import {screenContentPadding} from '../theme/screenLayout';
-import {notifySuccess, notifyWarning} from '../utils/notify';
+import {notifyError, notifySuccess, notifyWarning} from '../utils/notify';
 import {gpsDebugLog} from '../utils/gpsDebugLog';
 import {hapticMedium, hapticSelection} from '../utils/haptics';
+import {acquireDeviceCoords} from '../utils/deviceLocation';
 
 interface PropertySealScreenProps {
   user: SessionUser;
@@ -75,6 +76,7 @@ export default function PropertySealScreen({
   const [photoSlots, setPhotoSlots] = useState<PhotoSlot[]>([{id: 'slot-1', uri: null}]);
   const [capturingPhoto, setCapturingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [remarksFocused, setRemarksFocused] = useState(false);
 
   // Location appears as soon as Seal / Deseal is chosen (kind defaults to seal).
@@ -126,7 +128,8 @@ export default function PropertySealScreen({
     gps.gpsAllowed &&
     gps.currentLat != null &&
     gps.currentLng != null &&
-    (gps.currentAccuracy == null || gps.currentAccuracy <= PROPERTY_SEAL_MAX_GPS_ACCURACY_M);
+    gps.currentAccuracy != null &&
+    gps.currentAccuracy <= PROPERTY_SEAL_MAX_GPS_ACCURACY_M;
 
   const canSave = Boolean(kind) &&
     gpsReady &&
@@ -149,6 +152,7 @@ export default function PropertySealScreen({
     setFinalRemarks('');
     photoIdRef.current = 1;
     setPhotoSlots([{id: 'slot-1', uri: null}]);
+    gps.clearGps();
   };
 
   const pickPhotoForSlot = async (slotId: string, useCamera: boolean) => {
@@ -174,11 +178,30 @@ export default function PropertySealScreen({
       if (result.didCancel) {
         return;
       }
+      if (result.errorCode) {
+        const message =
+          result.errorCode === 'permission'
+            ? useCamera
+              ? 'Camera permission is required. Allow camera access in Settings and try again.'
+              : 'Photo library permission is required. Allow access in Settings and try again.'
+            : result.errorMessage || 'Could not open the camera or gallery.';
+        notifyError(message);
+        Alert.alert('Photo unavailable', message);
+        return;
+      }
       const uri = result.assets?.[0]?.uri;
       if (!uri) {
+        notifyError('No photo was returned. Try again.');
         return;
       }
       setPhotoSlots(prev => prev.map(slot => (slot.id === slotId ? {...slot, uri} : slot)));
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Could not capture or pick a photo. Check permissions and try again.';
+      notifyError(message);
+      Alert.alert('Photo failed', message);
     } finally {
       setCapturingPhoto(false);
     }
@@ -205,7 +228,18 @@ export default function PropertySealScreen({
   };
 
   const handleSave = async () => {
-    if (!kind || !canSave || gps.currentLat == null || gps.currentLng == null) {
+    if (savingRef.current || saving) {
+      return;
+    }
+
+    const formReady =
+      Boolean(kind) &&
+      finalRemarks.trim().length > 0 &&
+      (isDeseal
+        ? photoUris.length > 0
+        : scheme.trim().length > 0 && plotLabel.trim().length > 0 && Boolean(activityValue));
+
+    if (!formReady) {
       Alert.alert(
         'Incomplete form',
         isDeseal
@@ -222,10 +256,23 @@ export default function PropertySealScreen({
           SEAL_ACTIVITIES.find(a => a.value === (activityValue as PropertySealActivityValue))?.label ||
           'Sealed / demolished';
 
+    savingRef.current = true;
     setSaving(true);
     try {
+      // Fresh GPS at save time — do not trust a stale on-screen fix.
+      const coords = await acquireDeviceCoords({
+        maxAccuracyMeters: PROPERTY_SEAL_MAX_GPS_ACCURACY_M,
+        stayInApp: true,
+        debugTag: 'PropertySealSave',
+      });
+      if (coords.accuracy == null || coords.accuracy > PROPERTY_SEAL_MAX_GPS_ACCURACY_M) {
+        throw new Error(
+          `GPS accuracy must be ${PROPERTY_SEAL_MAX_GPS_ACCURACY_M} m or better before saving.`,
+        );
+      }
+
       await addPendingPropertySealVisit({
-        localId: `ps-${Date.now()}`,
+        localId: `ps-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         kind,
         officerId: user.id,
         officerName: user.name,
@@ -238,9 +285,9 @@ export default function PropertySealScreen({
         activityLabel,
         finalRemarks: finalRemarks.trim(),
         photoUris,
-        lat: gps.currentLat,
-        lng: gps.currentLng,
-        accuracyMeters: gps.currentAccuracy,
+        lat: coords.lat,
+        lng: coords.lng,
+        accuracyMeters: coords.accuracy,
         savedAt: new Date().toISOString(),
       });
 
@@ -266,9 +313,19 @@ export default function PropertySealScreen({
         );
       }
       onSaved();
-    } catch {
-      Alert.alert('Could not save', 'Try again.');
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Try again.';
+      if (/GPS|accuracy|location/i.test(message)) {
+        Alert.alert('Location required', message);
+        gps.startLocationFlow(false);
+      } else {
+        Alert.alert('Could not save', message);
+      }
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
@@ -443,6 +500,7 @@ export default function PropertySealScreen({
                           setActivityValue(item.value);
                         }}
                         accessibilityRole="button"
+                        accessibilityLabel={item.label}
                         accessibilityState={{selected}}>
                         <Text style={[styles.chipText, selected ? styles.chipTextActive : null]}>
                           {item.label}
@@ -475,7 +533,11 @@ export default function PropertySealScreen({
                   </TouchableOpacity>
                 </View>
                 {slot.uri ? (
-                  <Image source={{uri: slot.uri}} style={styles.photoPreview} />
+                  <Image
+                    source={{uri: slot.uri}}
+                    style={styles.photoPreview}
+                    accessibilityLabel={`Picture ${index + 1} preview`}
+                  />
                 ) : (
                   <Text style={styles.helper}>No picture in this field yet.</Text>
                 )}
@@ -526,6 +588,8 @@ export default function PropertySealScreen({
               hapticMedium();
               void handleSave();
             }}
+            accessibilityRole="button"
+            accessibilityLabel={isDeseal ? 'Save Property Deseal' : 'Save Property Seal'}
             accessibilityState={{disabled: !canSave, busy: saving}}>
             {saving ? (
               <ActivityIndicator color="#ffffff" />
@@ -536,7 +600,7 @@ export default function PropertySealScreen({
             )}
           </TouchableOpacity>
 
-          <GpsDebugPanel title="Property Seal GPS debug (dev)" />
+          {__DEV__ ? <GpsDebugPanel title="Property Seal GPS debug (dev)" /> : null}
         </>
       ) : null}
     </ScrollView>
@@ -641,11 +705,13 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    minHeight: 44,
     borderRadius: 999,
     marginRight: 8,
     marginBottom: 8,
+    justifyContent: 'center',
   },
   chipActive: {backgroundColor: colors.primary},
   chipInactive: {backgroundColor: '#e5e7eb'},

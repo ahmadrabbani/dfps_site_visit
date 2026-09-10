@@ -224,6 +224,16 @@ export async function acquireDeviceCoords(
         lng: coords.lng,
         accuracy: coords.accuracy,
       });
+      if (options.maxAccuracyMeters != null && coords.accuracy == null) {
+        gpsDebugLog(tag, 'accuracy missing on attempt', {attempt: i + 1});
+        if (i < attempts.length - 1) {
+          await delay(1500);
+          continue;
+        }
+        throw new Error(
+          `GPS accuracy was not reported. Move outdoors and retry until accuracy is ${options.maxAccuracyMeters} m or better.`,
+        );
+      }
       if (
         options.maxAccuracyMeters != null &&
         coords.accuracy != null &&

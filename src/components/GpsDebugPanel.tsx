@@ -33,8 +33,8 @@ export default function GpsDebugPanel({title = 'GPS debug'}: GpsDebugPanelProps)
         {lines.length === 0 ? (
           <Text style={styles.empty}>Tap Get location — steps will appear here and in logcat.</Text>
         ) : (
-          lines.map(line => (
-            <Text key={line} style={styles.line}>
+          lines.map((line, index) => (
+            <Text key={`${index}-${line.slice(0, 24)}`} style={styles.line}>
               {line}
             </Text>
           ))

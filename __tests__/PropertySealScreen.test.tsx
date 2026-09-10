@@ -25,6 +25,7 @@ jest.mock('../src/hooks/useSiteVisitGps', () => ({
     handleGetLocation: jest.fn(),
     startLocationFlow: jest.fn(),
     handleOpenLocationSettings: jest.fn(),
+    clearGps: jest.fn(),
   }),
   formatCoord: (value: number | null) => (value != null ? String(value) : '—'),
 }));
@@ -97,7 +98,7 @@ describe('PropertySealScreen', () => {
     expect(screen.getByText('GPS Location Ready')).toBeTruthy();
     expect(screen.queryByText(/Choose the survey type first/)).toBeNull();
     expect(screen.queryByText(/Fills after you pick/)).toBeNull();
-    expect(screen.getByText('MapLibre preview')).toBeTruthy();
+    expect(screen.getByText('Show map')).toBeTruthy();
     expect(screen.getByText('Open in Google Maps')).toBeTruthy();
     await waitFor(() => {
       expect(screen.getByLabelText('Scheme')).toBeTruthy();

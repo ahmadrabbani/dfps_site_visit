@@ -288,6 +288,19 @@ export function useSiteVisitGps(
     }
   }, [startLocationFlow, log, finishGpsFailure]);
 
+  /** Clears the current fix (e.g. when switching Seal ↔ Deseal). */
+  const clearGps = useCallback(() => {
+    gpsRunIdRef.current += 1;
+    setGpsAllowed(false);
+    setGpsLoading(false);
+    setCurrentLat(null);
+    setCurrentLng(null);
+    setCurrentAccuracy(null);
+    setGpsError('Tap Get location below to record GPS for this survey.');
+    setGpsPermissionDenied(false);
+    setNeedsPermissionPrompt(true);
+  }, []);
+
   useEffect(() => {
     mountedRef.current = true;
     screenFocusedRef.current = true;
@@ -368,5 +381,6 @@ export function useSiteVisitGps(
     handleGetLocation,
     startLocationFlow,
     handleOpenLocationSettings,
+    clearGps,
   };
 }

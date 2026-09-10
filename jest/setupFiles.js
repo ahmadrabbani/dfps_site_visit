@@ -127,7 +127,7 @@ jest.mock('../src/components/OfficerLocationMap', () => {
     __esModule: true,
     default: () => (
       <View>
-        <Text>MapLibre preview</Text>
+        <Text>Show map</Text>
         <Text>Open in Google Maps</Text>
       </View>
     ),
@@ -192,7 +192,9 @@ jest.mock('../src/utils/locationPermission', () => ({
 }));
 
 jest.mock('../src/utils/deviceLocation', () => ({
-  acquireDeviceCoords: jest.fn(() => Promise.resolve({lat: 31.5204, lng: 74.3587})),
+  acquireDeviceCoords: jest.fn(() =>
+    Promise.resolve({lat: 31.5204, lng: 74.3587, accuracy: 12}),
+  ),
   isGpsPermissionError: jest.fn(() => false),
   isGpsSettingsError: jest.fn(() => false),
 }));

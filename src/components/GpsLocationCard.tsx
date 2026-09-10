@@ -36,41 +36,61 @@ export default function GpsLocationCard({
   onRetryGps,
   onOpenSettings,
 }: GpsLocationCardProps) {
+  const accuracyMissing =
+    maxAccuracyMeters != null && gpsAllowed && currentAccuracy == null;
   const accuracyTooWeak =
     maxAccuracyMeters != null &&
     currentAccuracy != null &&
     currentAccuracy > maxAccuracyMeters;
+  const locationUsable = gpsAllowed && !accuracyTooWeak && !accuracyMissing;
+
+  const statusLabel = gpsLoading
+    ? 'Acquiring GPS location...'
+    : locationUsable
+      ? 'GPS Location Ready'
+      : accuracyMissing
+        ? 'GPS accuracy unknown'
+        : accuracyTooWeak
+          ? 'GPS accuracy too weak'
+          : needsPermissionPrompt
+            ? 'Location required'
+            : 'GPS Signal Offline';
+
+  const coordsSummary =
+    currentLat != null && currentLng != null
+      ? `Latitude ${formatCoord(currentLat)}, longitude ${formatCoord(currentLng)}${
+          currentAccuracy != null ? `, accuracy ${Math.round(currentAccuracy)} meters` : ''
+        }`
+      : gpsError || 'Location not available yet';
 
   return (
-    <View style={styles.locationSection}>
+    <View
+      style={styles.locationSection}
+      accessibilityRole="summary"
+      accessibilityLabel={`GPS status: ${statusLabel}. ${coordsSummary}`}>
       <View style={styles.locationCard}>
         <View style={styles.locationCardHeader}>
           <Icon
-            source={gpsAllowed && !accuracyTooWeak ? 'map-marker' : 'map-marker-off'}
+            source={locationUsable ? 'map-marker' : 'map-marker-off'}
             size={22}
             color={
               gpsLoading
                 ? colors.mutedText
-                : gpsAllowed && !accuracyTooWeak
+                : locationUsable
                   ? colors.success
                   : colors.danger
             }
           />
-          <Text style={styles.locationTitle}>
-            {gpsLoading
-              ? 'Acquiring GPS location...'
-              : gpsAllowed && !accuracyTooWeak
-                ? 'GPS Location Ready'
-                : accuracyTooWeak
-                  ? 'GPS accuracy too weak'
-                  : needsPermissionPrompt
-                    ? 'Location required'
-                    : 'GPS Signal Offline'}
+          <Text style={styles.locationTitle} accessibilityRole="header">
+            {statusLabel}
           </Text>
         </View>
 
         {gpsAllowed && currentLat != null && currentLng != null ? (
-          <View style={styles.coordinatesContainer}>
+          <View
+            style={styles.coordinatesContainer}
+            accessible
+            accessibilityLabel={coordsSummary}>
             <View style={styles.coordinateBlock}>
               <Text style={styles.coordinateLabel}>LATITUDE</Text>
               <Text style={styles.coordinateValue}>{formatCoord(currentLat)}</Text>
@@ -97,34 +117,51 @@ export default function GpsLocationCard({
             ) : null}
           </View>
         ) : (
-          <Text style={styles.locationError}>
+          <Text style={styles.locationError} accessibilityLiveRegion="polite">
             {gpsError || 'Tap Get location below to record GPS for this survey.'}
           </Text>
         )}
 
         {accuracyTooWeak ? (
-          <Text style={styles.accuracyHint}>
+          <Text style={styles.accuracyHint} accessibilityLiveRegion="polite">
             Accuracy is {Math.round(currentAccuracy!)} m. Move outdoors until it is{' '}
             {maxAccuracyMeters} m or better, then tap Retry GPS.
           </Text>
         ) : null}
 
-        {!gpsLoading && (!gpsAllowed || accuracyTooWeak) ? (
+        {accuracyMissing ? (
+          <Text style={styles.accuracyHint} accessibilityLiveRegion="polite">
+            Accuracy was not reported. Tap Retry GPS outdoors until accuracy is{' '}
+            {maxAccuracyMeters} m or better.
+          </Text>
+        ) : null}
+
+        {!gpsLoading && (!gpsAllowed || accuracyTooWeak || accuracyMissing) ? (
           <View style={styles.locationActionRow}>
-            <TouchableOpacity style={styles.locationRetryBtn} onPress={onGetLocation}>
+            <TouchableOpacity
+              style={styles.locationRetryBtn}
+              onPress={onGetLocation}
+              accessibilityRole="button"
+              accessibilityLabel="Get GPS location">
               <Icon source="map-marker-radius" size={16} color="#ffffff" />
               <Text style={styles.locationRetryBtnText}>Get location</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.locationRetryBtn, styles.locationRetryBtnSecondary]}
-              onPress={onRetryGps}>
+              onPress={onRetryGps}
+              accessibilityRole="button"
+              accessibilityLabel="Retry GPS">
               <Icon source="refresh" size={16} color={colors.primary} />
               <Text style={[styles.locationRetryBtnText, styles.locationRetryBtnTextSecondary]}>
                 Retry GPS
               </Text>
             </TouchableOpacity>
             {gpsPermissionDenied && allowOpenSettings ? (
-              <TouchableOpacity style={styles.locationSettingsBtn} onPress={onOpenSettings}>
+              <TouchableOpacity
+                style={styles.locationSettingsBtn}
+                onPress={onOpenSettings}
+                accessibilityRole="button"
+                accessibilityLabel="Open location settings">
                 <Text style={styles.locationSettingsBtnText}>Open Settings</Text>
               </TouchableOpacity>
             ) : null}
@@ -219,8 +256,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primaryLight,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 8,
     gap: 6,
   },
@@ -241,8 +279,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: '#cbd5e1',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    minHeight: 44,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 8,
     justifyContent: 'center',
   },

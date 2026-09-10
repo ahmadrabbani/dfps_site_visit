@@ -1,17 +1,14 @@
 import React from 'react';
 import {Modal, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
 import {Icon} from 'react-native-paper';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {APP_TOUR_STEPS} from '../constants/appTourSteps';
 import {useAppTour} from '../context/AppTourContext';
-import {DRAWER_ROUTES, MAIN_STACK_ROUTES} from '../navigation/routeNames';
 import {colors} from '../theme/colors';
 import {glassStyles} from '../theme/glassStyles';
 import {hapticLight, hapticSelection, hapticSuccess} from '../utils/haptics';
 
 export default function AppTourModal() {
-  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const {visible, stepIndex, stepCount, isFirstStep, isLastStep, nextStep, prevStep, skipTour, finishTour} =
     useAppTour();
@@ -23,21 +20,15 @@ export default function AppTourModal() {
 
   const primaryLabel = isLastStep ? 'Get started' : isFirstStep ? 'Start tour' : 'Next';
 
-  const openDashboard = () => {
-    navigation.navigate(DRAWER_ROUTES.Main, {screen: MAIN_STACK_ROUTES.Dashboard});
-  };
-
   const handleSkip = () => {
     hapticLight();
     skipTour();
-    openDashboard();
   };
 
   const handlePrimary = () => {
     if (isLastStep) {
       hapticSuccess();
       finishTour();
-      openDashboard();
       return;
     }
     hapticSelection();
@@ -56,11 +47,16 @@ export default function AppTourModal() {
       <View style={[styles.backdrop, {paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24}]}>
         <View style={styles.card}>
           <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.stepRow}>
+            <View
+              style={styles.stepRow}
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel={`Tour step ${stepIndex + 1} of ${stepCount}`}>
               {APP_TOUR_STEPS.map((_, index) => (
                 <View
                   key={_.id}
                   style={[styles.stepDot, index === stepIndex ? styles.stepDotActive : null]}
+                  importantForAccessibility="no"
                 />
               ))}
             </View>

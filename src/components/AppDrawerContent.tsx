@@ -197,6 +197,7 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
               <Pressable
                 disabled={menuNavigating || syncMutation.isPending}
                 accessibilityRole="button"
+                accessibilityLabel={item.label}
                 accessibilityState={{selected: active, disabled: menuNavigating || syncMutation.isPending}}
                 onPress={() => {
                   hapticLight();
@@ -275,6 +276,13 @@ export default function AppDrawerContent(props: DrawerContentComponentProps) {
             <Pressable
               disabled={syncMutation.isPending || !isOnline}
               onPress={handleSync}
+              accessibilityRole="button"
+              accessibilityLabel={
+                syncMutation.isPending
+                  ? 'Syncing pending visits'
+                  : `Sync ${pendingCount} pending visits`
+              }
+              accessibilityState={{disabled: syncMutation.isPending || !isOnline, busy: syncMutation.isPending}}
               style={({pressed}) => [
                 styles.syncButton,
                 !isOnline ? styles.syncButtonDisabled : null,
